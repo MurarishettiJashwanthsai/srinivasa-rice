@@ -1,6 +1,6 @@
 from sqlalchemy import text
 from database import engine, Base
-from models import RateAuditLog
+import models # Ensure models are loaded for create_all
 
 def run_migration():
     Base.metadata.create_all(bind=engine)
@@ -15,6 +15,8 @@ def run_migration():
             ("rice_prices", "public_note", "VARCHAR"),
             ("rice_prices", "internal_note", "VARCHAR"),
             ("rice_prices", "updated_by", "VARCHAR DEFAULT 'system'"),
+            ("rice_prices", "last_updated", "VARCHAR"),
+            ("rice_prices", "image_url", "VARCHAR"),
             ("rice_prices", "moisture", "VARCHAR DEFAULT '12-14% Max'"),
             ("rice_prices", "processing", "VARCHAR DEFAULT '100% Sortexed'"),
             ("leads", "request_id", "VARCHAR"),
@@ -27,6 +29,7 @@ def run_migration():
             ("leads", "incoterm", "VARCHAR"),
             ("leads", "status", "VARCHAR DEFAULT 'new'"),
             ("leads", "source_page", "VARCHAR DEFAULT 'contact'"),
+            ("leads", "created_at", "VARCHAR"),
         ]
 
         for table, col, col_type in columns_to_add:
@@ -34,8 +37,9 @@ def run_migration():
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
                 conn.commit()
                 print(f"Added column {col} to {table}")
-            except Exception as e:
+            except Exception:
                 pass
 
 if __name__ == "__main__":
     run_migration()
+

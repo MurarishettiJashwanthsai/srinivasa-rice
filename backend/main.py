@@ -32,25 +32,13 @@ cloudinary.config(
 )
 
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    from migrate_db import run_migration
+    run_migration()
     
-    # Migrate DB to add new columns if they don't exist
     from database import SessionLocal
     db = SessionLocal()
     
     try:
-        try:
-            db.execute(text("ALTER TABLE rice_prices ADD COLUMN moisture VARCHAR DEFAULT '12-14% Max'"))
-            db.commit()
-        except Exception:
-            db.rollback()
-            
-        try:
-            db.execute(text("ALTER TABLE rice_prices ADD COLUMN processing VARCHAR DEFAULT '100% Sortexed'"))
-            db.commit()
-        except Exception:
-            db.rollback()
-
         if db.query(RicePrice).count() == 0:
             seed_data = [
                 ("Sona Masuri Steam", 850.0, 840.0, 1.19, "up"),
