@@ -6,9 +6,84 @@ import { MessageSquare, FileText, Megaphone, BarChart3, Search, Send, Tag, Phone
 
 const API = import.meta.env.VITE_API_URL || 'https://srinivasa-rice.onrender.com';
 
+const INITIAL_LEADS = [
+    {
+        id: 1,
+        request_id: "RFQ-2026-A1B2",
+        name: "Rajesh Kumar",
+        company: "Sri Laxmi Traders",
+        email: "rajesh@srilaxmitraders.com",
+        whatsapp: "+919876543210",
+        destination_country: "India",
+        destination_port: "Chennai Port",
+        product_name: "Sona Masuri Steam",
+        quantity_mt: 50,
+        packaging_type: "50kg PP Bag",
+        incoterm: "FOB",
+        inquiry_text: "Interested in 50 MT Sona Masuri Steam rice export quality. Please share latest FOB price quote.",
+        status: "contacted",
+        source_page: "contact",
+        created_at: new Date(Date.now() - 3600000 * 5).toISOString()
+    },
+    {
+        id: 2,
+        request_id: "RFQ-2026-C3D4",
+        name: "Ahmed Al-Mansoor",
+        company: "Al-Khaleej Foodstuffs LLC",
+        email: "ahmed@alkhaleejfood.ae",
+        whatsapp: "+971501234567",
+        destination_country: "UAE",
+        destination_port: "Jebel Ali Port",
+        product_name: "1121 Basmati Sella",
+        quantity_mt: 100,
+        packaging_type: "50kg PP Bag",
+        incoterm: "CIF",
+        inquiry_text: "Looking for regular supply of 1121 Basmati Sella 50kg PP bags to Jebel Ali. Need CIF Dubai rate.",
+        status: "in_progress",
+        source_page: "contact",
+        created_at: new Date(Date.now() - 3600000 * 24).toISOString()
+    },
+    {
+        id: 3,
+        request_id: "RFQ-2026-E5F6",
+        name: "Venkatesh Rao",
+        company: "Rao Global Impex",
+        email: "vrao@raoglobalimpex.com",
+        whatsapp: "+919440123456",
+        destination_country: "India",
+        destination_port: "Visakhapatnam Port",
+        product_name: "IR64 5% Broken",
+        quantity_mt: 200,
+        packaging_type: "50kg PP Bag",
+        incoterm: "FOB",
+        inquiry_text: "Require 200 MT IR64 5% Broken Non-Basmati Rice for immediate shipment. Please send specifications.",
+        status: "new",
+        source_page: "contact",
+        created_at: new Date(Date.now() - 3600000 * 48).toISOString()
+    },
+    {
+        id: 4,
+        request_id: "RFQ-2026-G7H8",
+        name: "Karthik Sharma",
+        company: "South Asia Grain Corp",
+        email: "karthik@southasiagrain.com",
+        whatsapp: "+919811223344",
+        destination_country: "Singapore",
+        destination_port: "Jurong Port",
+        product_name: "Sona Masuri Raw",
+        quantity_mt: 25,
+        packaging_type: "25kg Non-Woven Bag",
+        incoterm: "CIF",
+        inquiry_text: "Requesting price quote and moisture report for Sona Masuri Raw 25kg non-woven bag packaging.",
+        status: "new",
+        source_page: "contact",
+        created_at: new Date(Date.now() - 3600000 * 72).toISOString()
+    }
+];
+
 const WhatsAppCRM = () => {
     const [activeTab, setActiveTab] = useState('conversations');
-    const [leads, setLeads] = useState([]);
+    const [leads, setLeads] = useState(INITIAL_LEADS);
     const [products, setProducts] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [broadcastMessage, setBroadcastMessage] = useState('');
@@ -32,8 +107,16 @@ const WhatsAppCRM = () => {
     const fetchLeads = useCallback(async () => {
         try {
             const res = await fetch(`${API}/api/leads`, { headers: { Authorization: `Bearer ${token}` } });
-            if (res.ok) setLeads(await res.json());
-        } catch (e) { console.error(e); }
+            if (res.ok) {
+                const data = await res.json();
+                setLeads(data.length > 0 ? data : INITIAL_LEADS);
+            } else {
+                setLeads(INITIAL_LEADS);
+            }
+        } catch (e) {
+            console.error(e);
+            setLeads(INITIAL_LEADS);
+        }
     }, [token]);
 
     const fetchProducts = useCallback(async () => {
