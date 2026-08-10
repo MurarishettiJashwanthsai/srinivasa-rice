@@ -39,7 +39,13 @@ def init_db():
     db = SessionLocal()
     
     try:
-        if db.query(RicePrice).count() == 0:
+        try:
+            rice_count = db.query(RicePrice).count()
+        except Exception:
+            db.rollback()
+            rice_count = 0
+
+        if rice_count == 0:
             seed_data = [
                 ("Sona Masuri Steam", 850.0, 840.0, 1.19, "up"),
                 ("Sona Masuri Raw", 830.0, 830.0, 0.0, "neutral"),
@@ -68,7 +74,13 @@ def init_db():
                 
             db.commit()
 
-        if db.query(Lead).count() == 0:
+        try:
+            lead_count = db.query(Lead).count()
+        except Exception:
+            db.rollback()
+            lead_count = 0
+
+        if lead_count == 0:
             current_time = datetime.datetime.now().isoformat()
             seed_leads = [
                 Lead(
