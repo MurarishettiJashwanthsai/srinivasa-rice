@@ -3,8 +3,14 @@ import { TrendingUp, TrendingDown, Minus, Clock, Download, RefreshCw } from 'luc
 import { motion } from 'framer-motion';
 import GlassCard from '../components/GlassCard';
 import { SkeletonTableRow, SkeletonStat } from '../components/SkeletonLoader';
+import useMeta from '../hooks/useMeta';
 
 const MarketDashboard = () => {
+    useMeta({
+        title: 'Miryalaguda Rice Market Rates',
+        description: 'View dated indicative wholesale rice rates from Miryalaguda. Final prices depend on grade, quantity, packaging and delivery terms.',
+    });
+
     const [prices, setPrices] = useState([]);
     const [lastFetchTime, setLastFetchTime] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -136,7 +142,7 @@ const MarketDashboard = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {loading ? Array.from({ length: 5 }).map((_, i) => <SkeletonTableRow key={i} cols={4} />) : sortedPrices.map((item, i) => (
+                                {loading ? Array.from({ length: 5 }).map((_, i) => <SkeletonTableRow key={i} cols={4} />) : sortedPrices.map((item) => (
                                     <tr key={item.id} className="hover:bg-primary/5 transition-colors">
                                         <td className="py-3 px-6 font-black text-text-main">{item.variety_name}</td>
                                         <td className="py-3 px-6 font-black text-xl text-primary">₹{item.current_price_mt.toFixed(0)}</td>

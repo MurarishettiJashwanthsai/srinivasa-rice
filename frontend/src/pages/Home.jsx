@@ -200,7 +200,7 @@ const Home = () => {
                         <p className="text-text-muted text-lg max-w-2xl mx-auto font-bold">Decades of expertise in rice canvassing and global export logistics.</p>
                     </motion.div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                        {features.map((f, i) => (
+                        {features.map((f) => (
                             <div key={f.title} className="premium-card !p-8 group hover:border-primary transition-colors">
                                 <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-8 group-hover:bg-primary group-hover:text-white transition-all duration-300">
                                     <f.icon className="w-8 h-8 text-primary group-hover:text-white" />
@@ -229,22 +229,26 @@ const Home = () => {
                     
                     <motion.div {...fadeUp} className="premium-card overflow-hidden !p-0">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left">
+                            <table className="w-full text-left" aria-label="Miryalaguda Rice Market Intelligence Preview">
+                                <caption>
+                                    <span className="sr-only">Miryalaguda Wholesale Rice Indicative Market Rates</span>
+                                </caption>
                                 <thead>
                                     <tr className="bg-background text-text-main text-xs uppercase tracking-[0.2em]">
-                                        <th className="py-6 px-8 font-black">Rice Variety</th>
-                                        <th className="py-6 px-8 font-black">Price (₹/MT)</th>
-                                        <th className="py-6 px-8 font-black text-center">Trend</th>
+                                        <th scope="col" className="py-6 px-8 font-black">Rice Variety</th>
+                                        <th scope="col" className="py-6 px-8 font-black">Price (₹/MT)</th>
+                                        <th scope="col" className="py-6 px-8 font-black text-center">Trend</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
-                                    {products.slice(0, 5).map((item, i) => (
+                                    {products.slice(0, 5).map((item) => (
                                         <tr key={item.id} className="hover:bg-primary/5 transition-colors">
                                             <td className="py-6 px-8 font-black text-text-main">{item.variety_name}</td>
                                             <td className="py-6 px-8 font-black text-2xl text-primary">₹{item.current_price_mt.toFixed(0)}</td>
                                             <td className="py-6 px-8 text-center">
                                                 <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest ${item.trend === 'up' ? 'bg-emerald-500/10 text-emerald-500' : item.trend === 'down' ? 'bg-red-500/10 text-red-500' : 'bg-text-muted/10 text-text-muted'}`}>
                                                     {item.trend === 'up' ? <TrendingUp className="w-4 h-4" /> : item.trend === 'down' ? '▼' : '—'} {item.percentage_change}%
+                                                    <span className="sr-only">({item.trend === 'up' ? 'Price increased' : item.trend === 'down' ? 'Price decreased' : 'Price unchanged'})</span>
                                                 </span>
                                             </td>
                                         </tr>

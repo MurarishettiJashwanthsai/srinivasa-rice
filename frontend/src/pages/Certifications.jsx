@@ -1,8 +1,14 @@
 import { Award, ShieldCheck, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import GlassCard from '../components/GlassCard';
+import useMeta from '../hooks/useMeta';
 
 const Certifications = () => {
+    useMeta({
+        title: 'Export Credentials and Quality Assurance',
+        description: 'View company registrations, partner-mill credentials, inspection options and quality-assurance information.',
+    });
+
     const fadeUp = { initial: { opacity: 0, y: 30 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { duration: 0.6 } };
 
     const certs = [

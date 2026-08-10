@@ -1,8 +1,14 @@
 import { Wheat, CheckCircle2, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import GlassCard from '../components/GlassCard';
+import useMeta from '../hooks/useMeta';
 
 const About = () => {
+    useMeta({
+        title: 'About Sri Srinivasa Canvassing',
+        description: "Learn about Sri Srinivasa Canvassing's rice sourcing, mill relationships, inspection process and Miryalaguda market experience.",
+    });
+
     const fadeUp = { initial: { opacity: 0, y: 30 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: '-50px' }, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } };
 
     const values = [

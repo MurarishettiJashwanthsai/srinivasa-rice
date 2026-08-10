@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
@@ -14,22 +14,7 @@ const AnimatedCounter = ({
     const [hasAnimated, setHasAnimated] = useState(false);
     const ref = useRef(null);
 
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting && !hasAnimated) {
-                    setHasAnimated(true);
-                    animateCount();
-                }
-            },
-            { threshold: 0.3 }
-        );
-
-        if (ref.current) observer.observe(ref.current);
-        return () => observer.disconnect();
-    }, [hasAnimated]);
-
-    const animateCount = () => {
+    const animateCount = useCallback(() => {
         const startTime = performance.now();
 
         const tick = (now) => {
@@ -48,7 +33,22 @@ const AnimatedCounter = ({
         };
 
         requestAnimationFrame(tick);
-    };
+    }, [duration, end, decimals]);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting && !hasAnimated) {
+                    setHasAnimated(true);
+                    animateCount();
+                }
+            },
+            { threshold: 0.3 }
+        );
+
+        if (ref.current) observer.observe(ref.current);
+        return () => observer.disconnect();
+    }, [hasAnimated, animateCount]);
 
     const formatted = decimals > 0 ? count.toFixed(decimals) : count.toLocaleString();
 

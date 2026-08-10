@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,24 +29,24 @@ const WhatsAppCRM = () => {
         { id: 4, name: 'Quote Confirmation', category: 'sales', content: "Dear {buyer_name},\n\nThank you for your interest!\n\n📋 *Quote Details*\nVariety: {variety}\nQuantity: {quantity}\nPrice: {price}/MT FOB" },
     ];
 
-    useEffect(() => {
-        fetchLeads();
-        fetchProducts();
-    }, []);
-
-    const fetchLeads = async () => {
+    const fetchLeads = useCallback(async () => {
         try {
             const res = await fetch(`${API}/api/leads`, { headers: { Authorization: `Bearer ${token}` } });
             if (res.ok) setLeads(await res.json());
         } catch (e) { console.error(e); }
-    };
+    }, [token]);
 
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async () => {
         try {
             const res = await fetch(`${API}/api/products`);
             if (res.ok) setProducts(await res.json());
         } catch (e) { console.error(e); }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchLeads();
+        fetchProducts();
+    }, [fetchLeads, fetchProducts]);
 
     const generatePriceList = () => {
         const date = new Date().toLocaleDateString('en-IN');
@@ -61,11 +61,15 @@ const WhatsAppCRM = () => {
         return matchesSearch;
     });
 
-    const stats = [
-        { label: 'Total Contacts', value: leads.length, icon: Users, color: 'text-primary' },
-        { label: 'This Month', value: leads.filter(l => new Date(l.created_at) > new Date(Date.now() - 30 * 86400000)).length, icon: Clock, color: 'text-emerald-500' },
-        { label: 'Subscribers', value: leads.filter(l => l.inquiry_text?.includes('Price Alert')).length, icon: Tag, color: 'text-primary' },
-    ];
+    const stats = useMemo(() => {
+        // eslint-disable-next-line react-hooks/purity
+        const monthAgoTimestamp = new Date(Date.now() - 30 * 86400000);
+        return [
+            { label: 'Total Contacts', value: leads.length, icon: Users, color: 'text-primary' },
+            { label: 'This Month', value: leads.filter(l => new Date(l.created_at) > monthAgoTimestamp).length, icon: Clock, color: 'text-emerald-500' },
+            { label: 'Subscribers', value: leads.filter(l => l.inquiry_text?.includes('Price Alert')).length, icon: Tag, color: 'text-primary' },
+        ];
+    }, [leads]);
 
     return (
         <div className="min-h-screen bg-background py-10 transition-colors duration-500">
@@ -83,7 +87,7 @@ const WhatsAppCRM = () => {
 
                 {/* Stats */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
-                    {stats.map((s, i) => (
+                    {stats.map((s) => (
                         <div key={s.label} className="premium-card !p-8 flex items-center gap-6">
                             <div className={`w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center ${s.color}`}>
                                 <s.icon className="w-8 h-8" />
@@ -179,7 +183,7 @@ const WhatsAppCRM = () => {
 
                         {activeTab === 'templates' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {templates.map((t, i) => (
+                                {templates.map((t) => (
                                     <div key={t.id} className="premium-card !p-8 group">
                                         <div className="flex items-center justify-between mb-6">
                                             <div className="flex items-center gap-3">
@@ -346,7 +350,7 @@ const WhatsAppCRM = () => {
                                                 <p className="text-sm text-text-muted text-center py-8">No data yet.</p>
                                             ) : (
                                                 <div className="space-y-4">
-                                                    {topCompanies.map(([company, count], i) => (
+                                                    {topCompanies.map(([company, count]) => (
                                                         <div key={company}>
                                                             <div className="flex justify-between items-center mb-1.5">
                                                                 <span className="text-sm font-bold text-text-main truncate max-w-[60%]">{company}</span>

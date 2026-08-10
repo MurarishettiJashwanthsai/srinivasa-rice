@@ -1,8 +1,14 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import useMeta from '../hooks/useMeta';
 
 const Legal = () => {
     const { hash } = useLocation();
+
+    useMeta({
+        title: 'Privacy, Terms and Commodity Disclaimer',
+        description: 'Read the privacy policy, website terms and commodity-price disclaimer for Sri Srinivasa Canvassing. Information on data handling, retention, and indicative rates.',
+    });
 
     useEffect(() => {
         if (hash) {
@@ -14,60 +20,82 @@ const Legal = () => {
     }, [hash]);
 
     return (
-        <div className="bg-background pt-10 pb-20">
+        <div className="bg-background pt-10 pb-20 font-sans">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
 
                 <div className="text-center mb-16">
-                    <h1 className="text-4xl font-extrabold text-secondary tracking-tight mb-4">Legal & Policies</h1>
-                    <div className="w-24 h-1 bg-primary mx-auto rounded-full mb-10"></div>
+                    <h1 className="text-4xl md:text-5xl font-display font-black text-text-main tracking-tight mb-4">Legal & Policies</h1>
+                    <div className="w-24 h-1.5 bg-primary mx-auto rounded-full mb-6"></div>
+                    <p className="text-text-muted text-sm font-bold max-w-xl mx-auto">
+                        Operational transparency, data protection practices, and commodity price disclaimers for Sri Srinivasa Canvassing.
+                    </p>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 space-y-16">
+                <div className="p-4 mb-8 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs font-bold leading-relaxed">
+                    <strong>Notice:</strong> The legal documents and terms presented on this website provide general operational guidelines for business inquiries with Sri Srinivasa Canvassing. Commercial transactions, binding quotations, quality specifications, and delivery terms are finalized exclusively under executed B2B proforma invoices and sales contracts, subject to legal verification.
+                </div>
+
+                <div className="premium-card p-8 sm:p-12 space-y-16">
 
                     <section id="privacy-policy" className="scroll-mt-24">
-                        <h2 className="text-3xl font-bold text-gray-900 mb-6">Privacy Policy</h2>
-                        <div className="prose text-gray-600 max-w-none space-y-4">
+                        <h2 className="text-3xl font-display font-black text-text-main mb-6">Privacy Policy</h2>
+                        <div className="prose text-text-muted max-w-none space-y-4 font-bold text-sm leading-relaxed">
                             <p>
-                                This Privacy Policy describes how Sri Srinivasa Canvassing collects, uses, and safeguards your business data in accordance with B2B GDPR guidelines.
+                                Sri Srinivasa Canvassing ("we", "us", or "our") respects the privacy of our business partners, millers, and global importers. This Privacy Policy outlines how we collect, process, retain, and protect business contact information submitted through our portal.
                             </p>
-                            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">Data Collection</h3>
+                            <h3 className="text-lg font-black text-text-main mt-6 mb-3">1. Information We Collect</h3>
                             <p>
-                                We collect personal and professional information such as Name, Company Name, Email Address, Phone Number, and Inquiry Details when you voluntarily submit a request via our contact form. This website is purely for informational B2B inquiries.
+                                When you submit a bulk quote request or price alert subscription, we collect:
                             </p>
-                            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">Data Usage</h3>
+                            <ul className="list-disc pl-5 space-y-2">
+                                <li>Full Name and Job/Company Designation</li>
+                                <li>Registered Business Name</li>
+                                <li>Business Email Address and WhatsApp / Telephone Number</li>
+                                <li>Destination Country, Destination Port, and Incoterm preferences</li>
+                                <li>Rice variety requirement, quantity in MT, and packaging specifications</li>
+                            </ul>
+                            <h3 className="text-lg font-black text-text-main mt-6 mb-3">2. Purpose of Collection & Consent</h3>
                             <p>
-                                Your data is strictly used to communicate with you regarding your wholesale and export inquiries. We do not sell, distribute, or lease your business data to third parties.
+                                Necessary enquiry details are processed strictly to respond to your wholesale quote request. Optional marketing consent for daily WhatsApp market rate alerts requires an explicit, separate opt-in checkbox during form submission. You may withdraw your consent at any time by contacting us at <a href="mailto:srinivasulu@srinivascanvassing.com" className="text-primary hover:underline">srinivasulu@srinivascanvassing.com</a>.
+                            </p>
+                            <h3 className="text-lg font-black text-text-main mt-6 mb-3">3. Data Retention & Access Control</h3>
+                            <p>
+                                Inquiry records are securely stored in protected database systems with access restricted to authorized canvassing personnel. Records are retained for up to 3 years to support ongoing commercial relations, after which they are archived or securely purged upon written owner approval.
+                            </p>
+                            <h3 className="text-lg font-black text-text-main mt-6 mb-3">4. Cookies & Analytics</h3>
+                            <p>
+                                This website uses essential functional cookies and local storage exclusively to maintain user preferences (such as theme selection). We do not deploy third-party advertising cookies or trade personal contact details.
                             </p>
                         </div>
                     </section>
 
-                    <hr className="border-gray-100" />
+                    <hr className="border-border" />
 
                     <section id="terms" className="scroll-mt-24">
-                        <h2 className="text-3xl font-bold text-gray-900 mb-6">Terms & Conditions</h2>
-                        <div className="prose text-gray-600 max-w-none space-y-4">
+                        <h2 className="text-3xl font-display font-black text-text-main mb-6">Terms & Conditions</h2>
+                        <div className="prose text-text-muted max-w-none space-y-4 font-bold text-sm leading-relaxed">
                             <p>
-                                By accessing this website, you agree to be bound by these website Terms and Conditions of Use.
+                                By accessing and navigating this website, you agree to comply with the following B2B terms of use:
                             </p>
                             <ul className="list-disc pl-5 space-y-2">
-                                <li>This website and its content are for informational purposes designed specifically for B2B procurement.</li>
-                                <li>No direct sales or financial transactions occur through this platform.</li>
-                                <li>We reserve the right to review, update, or decline inquiry requests based on stock availability and export regulations.</li>
-                                <li>All intellectual property, logos, and written content belong to Sri Srinivasa Canvassing.</li>
+                                <li>This website functions as an information portal for agricultural rice canvassing and wholesale sourcing from Miryalaguda, Telangana.</li>
+                                <li>No binding financial transaction or binding sales agreement is concluded directly through website submission alone.</li>
+                                <li>We reserve the right to verify commercial credentials before issuing proforma quotations or sample dispatches.</li>
+                                <li>All trademarks, mill partner badges, text, and visual assets belong to Sri Srinivasa Canvassing or their respective owners.</li>
                             </ul>
                         </div>
                     </section>
 
-                    <hr className="border-gray-100" />
+                    <hr className="border-border" />
 
                     <section id="disclaimer" className="scroll-mt-24">
-                        <h2 className="text-3xl font-bold text-gray-900 mb-6">Commodity Disclaimer</h2>
-                        <div className="prose text-gray-600 max-w-none space-y-4">
-                            <div className="bg-yellow-50 border-l-4 border-primary p-4 rounded-r text-gray-800 italic">
-                                "All pricing discussed following an inquiry is strictly indicative and subject to daily market fluctuations. Final supply quality and documentation are verified by independent third-party inspection (SGS/Bureau Veritas) at the port of loading."
+                        <h2 className="text-3xl font-display font-black text-text-main mb-6">Commodity & Pricing Disclaimer</h2>
+                        <div className="prose text-text-muted max-w-none space-y-4 font-bold text-sm leading-relaxed">
+                            <div className="p-6 rounded-2xl bg-primary/10 border border-primary/20 text-text-main italic font-bold">
+                                "All wholesale rates displayed on this website or communicated via daily alerts are indicative market figures from Miryalaguda. Final firm prices depend on specific rice grade, moisture content, broken percentage, Sortex quality, packaging choice, loading port, Incoterm, and prevailing freight/currency rates at the time of contract issuance."
                             </div>
                             <p className="mt-4">
-                                Rice is an agricultural commodity prone to weather constraints, transit delays, and policy framework changes by the Government of India. As canvassers, we ensure exact mapping to specifications, but total supply timelines are subject to port congestion and shipping line availability.
+                                Agricultural commodities are subject to market fluctuations, monsoon crop yields, government export duty revisions, and port logistics constraints. Sri Srinivasa Canvassing acts as an experienced canvassing partner ensuring third-party inspection (SGS/Bureau Veritas/Geo-Chem) at port of loading prior to final dispatch.
                             </p>
                         </div>
                     </section>
@@ -80,3 +108,4 @@ const Legal = () => {
 };
 
 export default Legal;
+

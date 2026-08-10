@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { LogOut, Trash2, Plus, Edit2, Check, X, ImagePlus, Users, MessageSquareShare, MessageCircle, CreditCard, Search, Building2, Phone, Calendar, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
@@ -20,15 +20,19 @@ const AdminDashboard = () => {
     const token = localStorage.getItem('admin_token');
     const API = import.meta.env.VITE_API_URL || 'https://srinivasa-rice.onrender.com';
 
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async () => {
         try { const res = await fetch(`${API}/api/products`); if (res.ok) setProducts(await res.json()); } catch { toast.error('Failed to load products'); }
-    };
+    }, [API]);
 
-    const fetchLeads = async () => {
+    const fetchLeads = useCallback(async () => {
         try { const res = await fetch(`${API}/api/leads`, { headers: { Authorization: `Bearer ${token}` } }); if (res.ok) setLeads(await res.json()); } catch { console.error('Failed to load leads'); }
-    };
+    }, [API, token]);
 
-    useEffect(() => { fetchProducts(); fetchLeads(); }, []);
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        fetchProducts();
+        fetchLeads();
+    }, [fetchProducts, fetchLeads]);
 
     const generateBroadcast = () => {
         const date = new Date().toLocaleDateString('en-IN');

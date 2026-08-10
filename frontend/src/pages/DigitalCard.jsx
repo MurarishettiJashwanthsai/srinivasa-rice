@@ -244,22 +244,22 @@ const DigitalCard = () => {
                             { icon: Mail, value: card.email, href: `mailto:${card.email}` },
                             { icon: MapPin, value: card.location || 'Miryalaguda, Telangana, India', href: null },
                             ...(card.website ? [{ icon: Globe, value: card.website.replace(/https?:\/\//, ''), href: card.website }] : []),
-                        ].map(({ icon: Icon, value, href }) => (
-                            <div key={value}
+                        ].map((item) => (
+                            <div key={item.value}
                                 className="flex items-center gap-3 px-4 py-3 rounded-xl"
                                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                 <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                                     style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.15)' }}>
-                                    <Icon className="w-4 h-4 text-amber-400" />
+                                    <item.icon className="w-4 h-4 text-amber-400" />
                                 </div>
-                                {href ? (
-                                    <a href={href} target={href.startsWith('http') ? '_blank' : undefined}
+                                {item.href ? (
+                                    <a href={item.href} target={item.href.startsWith('http') ? '_blank' : undefined}
                                         rel="noopener noreferrer"
                                         className="text-sm font-bold text-white/70 hover:text-amber-400 transition-colors truncate">
-                                        {value}
+                                        {item.value}
                                     </a>
                                 ) : (
-                                    <span className="text-sm font-bold text-white/70 truncate">{value}</span>
+                                    <span className="text-sm font-bold text-white/70 truncate">{item.value}</span>
                                 )}
                             </div>
                         ))}

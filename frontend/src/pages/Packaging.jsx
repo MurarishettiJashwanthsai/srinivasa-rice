@@ -1,8 +1,14 @@
 import { Box, Ship, Truck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import GlassCard from '../components/GlassCard';
+import useMeta from '../hooks/useMeta';
 
 const Packaging = () => {
+    useMeta({
+        title: 'Rice Packaging and Export Logistics',
+        description: 'View bulk and retail rice packaging, custom branding and port-logistics information from Telangana, India.',
+    });
+
     const fadeUp = { initial: { opacity: 0, y: 30 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { duration: 0.6 } };
 
     return (

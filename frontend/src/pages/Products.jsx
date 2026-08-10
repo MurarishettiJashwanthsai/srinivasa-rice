@@ -3,8 +3,14 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import GlassCard from '../components/GlassCard';
 import { SkeletonCard } from '../components/SkeletonLoader';
+import useMeta from '../hooks/useMeta';
 
 const Products = () => {
+    useMeta({
+        title: 'Bulk Rice Varieties for Export',
+        description: 'View available Sona Masuri, RNR and JSR rice varieties, specifications and packaging options.',
+    });
+
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
 

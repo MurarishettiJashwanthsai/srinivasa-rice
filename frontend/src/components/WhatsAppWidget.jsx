@@ -4,7 +4,6 @@ import { X, Send, MessageCircle } from 'lucide-react';
 
 const WhatsAppWidget = () => {
     const [isExpanded, setIsExpanded] = useState(false);
-    const [selectedTemplate, setSelectedTemplate] = useState('');
 
     const phoneNumber = "919866760028";
 
@@ -12,13 +11,11 @@ const WhatsAppWidget = () => {
         { label: "Today's Prices", message: "Hi Sri Srinivasa Canvassing, I'm interested in today's live rice pricing. Can you share the latest rates?" },
         { label: 'Bulk Quote', message: "Hello, I'd like to request a bulk quote for rice export. Please share your current FOB pricing." },
         { label: 'Product Specs', message: "Hi, I need detailed product specifications and COA for your rice varieties. Can you help?" },
-        { label: 'Custom', message: '' },
     ];
 
     const handleSend = (msg) => {
-        const message = msg || selectedTemplate;
-        if (!message) return;
-        const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+        if (!msg) return;
+        const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(msg)}`;
         window.open(url, '_blank');
         setIsExpanded(false);
     };
