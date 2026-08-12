@@ -324,6 +324,30 @@ async def get_product_by_slug(slug: str, db: Session = Depends(get_db)):
 async def get_prices(db: Session = Depends(get_db)):
     return await get_products(db)
 
+async def save_image_file(image: UploadFile) -> Optional[str]:
+    # Primary: Upload to Cloudinary
+    try:
+        image.file.seek(0)
+        upload_result = cloudinary.uploader.upload(image.file, folder="rice_products")
+        if upload_result and upload_result.get("secure_url"):
+            return upload_result.get("secure_url")
+    except Exception as e:
+        print(f"Cloudinary upload note: {e}")
+
+    # Fallback: Save to local uploads directory
+    try:
+        os.makedirs("uploads", exist_ok=True)
+        filename = f"{secrets.token_hex(6)}_{image.filename}"
+        file_path = os.path.join("uploads", filename)
+        image.file.seek(0)
+        content = await image.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+        return f"/uploads/{filename}"
+    except Exception as e:
+        print(f"Local file save failed: {e}")
+        return None
+
 @app.post("/api/products/add")
 async def add_product(
     name: str = Form(...),
@@ -338,12 +362,7 @@ async def add_product(
     image_url = None
     
     if image:
-        try:
-            upload_result = cloudinary.uploader.upload(image.file, folder="rice_products")
-            image_url = upload_result.get("secure_url")
-        except Exception as e:
-            print(f"Cloudinary upload failed: {e}")
-            image_url = None
+        image_url = await save_image_file(image)
 
     try:
         new_rice = RicePrice(
@@ -479,6 +498,27 @@ async def update_product(
         "processing": row.processing,
         "status": row.status
     }
+
+@app.post("/api/products/{id}/image")
+async def upload_product_image(
+    id: int,
+    image: UploadFile = File(...),
+    current_user: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    row = db.query(RicePrice).filter(RicePrice.id == id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Variety not found")
+
+    image_url = await save_image_file(image)
+    if not image_url:
+        raise HTTPException(status_code=500, detail="Failed to save image")
+
+    row.image_url = image_url
+    row.last_updated = datetime.datetime.now().isoformat()
+    db.commit()
+    db.refresh(row)
+    return row
 
 @app.delete("/api/products/delete/{id}")
 async def delete_product(

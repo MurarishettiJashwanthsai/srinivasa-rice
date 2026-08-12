@@ -304,7 +304,7 @@ const AdminDashboard = () => {
                                             <tr key={item.id} className="hover:bg-surface-hover dark:hover:bg-white/5 transition-colors">
                                                 <td className="py-4 px-6 w-20">
                                                     <div className="relative group w-14 h-14 bg-surface-hover dark:bg-white/5 rounded-xl overflow-hidden flex items-center justify-center border border-border dark:border-white/10 mx-auto">
-                                                        {item.image_url ? <img src={item.image_url.startsWith('http') ? item.image_url : `${API}/${item.image_url}`} alt={item.variety_name} className="w-full h-full object-cover" /> : <span className="text-text-subtle text-xs">No img</span>}
+                                                        {item.image_url ? <img src={item.image_url.startsWith('http') ? item.image_url : `${API}${item.image_url.startsWith('/') ? '' : '/'}${item.image_url}`} alt={item.variety_name} className="w-full h-full object-cover" /> : <span className="text-text-subtle text-xs">No img</span>}
                                                         <label className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity rounded-xl"><ImagePlus className="w-4 h-4 mb-0.5" /><span className="text-[9px] font-bold">Upload</span><input type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(item.id, e.target.files[0])} /></label>
                                                     </div>
                                                 </td>

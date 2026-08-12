@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API_BASE_URL } from '../config/api';
 
 const getCloudinaryUrl = (url, width, quality = 'auto') => {
     if (!url || typeof url !== 'string') return url;
@@ -23,7 +24,12 @@ export const OptimizedImage = ({
     const [hasError, setHasError] = useState(false);
     const [isLoaded, setIsLoaded] = useState(false);
 
-    const actualSrc = hasError || !src ? fallbackSrc : src;
+    let rawSrc = src;
+    if (rawSrc && typeof rawSrc === 'string' && rawSrc.startsWith('/uploads/')) {
+        rawSrc = `${API_BASE_URL}${rawSrc}`;
+    }
+
+    const actualSrc = hasError || !rawSrc ? fallbackSrc : rawSrc;
 
     // Generate responsive Cloudinary srcset if applicable
     let srcSet = undefined;
