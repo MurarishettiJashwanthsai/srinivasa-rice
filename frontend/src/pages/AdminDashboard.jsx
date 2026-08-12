@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { LogOut, Trash2, Plus, Edit2, Check, X, ImagePlus, Users, MessageSquareShare, MessageCircle, CreditCard, Search, Building2, Phone, Calendar, MessageSquare, ChevronDown, ChevronUp, Bell, BellRing } from 'lucide-react';
+import { Trash2, Plus, Edit2, Check, X, ImagePlus, Users, MessageSquareShare, MessageCircle, CreditCard, Search, Building2, Phone, Calendar, MessageSquare, ChevronDown, ChevronUp, Bell, BellRing } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
 import useInquiryNotifications from '../hooks/useInquiryNotifications';
 
@@ -284,9 +284,6 @@ const AdminDashboard = () => {
                         <Link to="/admin/cards" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary font-semibold text-sm border border-primary/20 hover:bg-primary/20 transition-all">
                             <CreditCard className="w-4 h-4" /> Digital Cards
                         </Link>
-                        <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border dark:border-white/10 text-sm font-medium text-text-muted dark:text-gray-300 hover:bg-surface-hover dark:hover:bg-white/5 transition-all">
-                            <LogOut className="w-4 h-4" /> Sign Out
-                        </button>
                     </div>
                 </div>
 

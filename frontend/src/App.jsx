@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { lazy, Suspense, useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
+import AdminHeader from './components/AdminHeader';
 import Footer from './components/Footer';
 import LiveTicker from './components/LiveTicker';
 import Home from './pages/Home';
@@ -42,6 +43,7 @@ const PageLoader = () => (
 
 const AdminPage = ({ children }) => (
     <div className="min-h-screen bg-background font-sans">
+        <AdminHeader />
         <main id="main-content" tabIndex="-1">
             <ErrorBoundary fallbackTitle="Administrative Page Unavailable">
                 <Suspense fallback={<PageLoader />}>{children}</Suspense>
