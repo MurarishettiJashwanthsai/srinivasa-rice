@@ -53,7 +53,7 @@ const Footer = () => {
         },
     ];
 
-    const certBadges = ['APEDA', 'FSSAI', 'ISO 9001'];
+    const certBadges = ['IEC', 'GST Registered', 'ISO 9001'];
 
     return (
         <footer className="relative bg-white dark:bg-[#050A14] text-text-main dark:text-white overflow-hidden transition-colors duration-500 border-t border-border dark:border-white/5" id="site-footer">

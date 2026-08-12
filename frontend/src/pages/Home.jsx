@@ -53,7 +53,7 @@ const Home = () => {
     ];
 
     const features = [
-        { icon: ShieldCheck, title: 'Certified Quality', desc: 'APEDA & FSSAI certified. Rigorous third-party inspections at every stage.' },
+        { icon: ShieldCheck, title: 'Certified Quality', desc: 'IEC & GST registered. Rigorous third-party inspections at every stage.' },
         { icon: Globe2, title: 'Worldwide Export', desc: 'Krishnapatnam & Chennai ports with efficient global logistics network.' },
         { icon: Box, title: 'Custom Packaging', desc: '26kg, 50kg PP bags and customizable bulk packaging for importers.' },
         { icon: Truck, title: 'Fast Logistics', desc: 'Strategic location with direct port connectivity for rapid shipments.' },

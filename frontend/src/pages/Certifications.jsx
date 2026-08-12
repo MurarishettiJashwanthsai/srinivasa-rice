@@ -12,8 +12,6 @@ const Certifications = () => {
     const fadeUp = { initial: { opacity: 0, y: 30 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { duration: 0.6 } };
 
     const companyCredentials = [
-        { icon: Award, title: 'APEDA Registration', entity: 'Sri Srinivasa Canvassing', desc: 'Registered with the Agricultural and Processed Food Products Export Development Authority (APEDA), authorizing direct merchant export of Indian non-basmati & basmati rice.' },
-        { icon: ShieldCheck, title: 'FSSAI License', entity: 'Sri Srinivasa Canvassing', desc: 'Compliant with the Food Safety and Standards Authority of India food safety protocols and hygiene standards for export storage and handling.' },
         { icon: FileCheck, title: 'IEC & GST Registered', entity: 'Sri Srinivasa Canvassing', desc: 'Authorized Import Export Code (IEC) holder registered with DGFT, India for official cross-border trade transactions.' },
     ];
 

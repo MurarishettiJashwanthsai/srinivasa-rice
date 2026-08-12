@@ -214,7 +214,7 @@ const ProductDetail = () => {
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
                             <div className="p-3.5 rounded-xl bg-surface-hover/30 border border-border/30 flex items-center gap-2.5">
                                 <ShieldCheck className="w-5 h-5 text-primary shrink-0" />
-                                <span className="text-xs font-black text-text-main">APEDA / FSSAI Compliance</span>
+                                <span className="text-xs font-black text-text-main">IEC & GST Registered Trade</span>
                             </div>
                             <div className="p-3.5 rounded-xl bg-surface-hover/30 border border-border/30 flex items-center gap-2.5">
                                 <Package className="w-5 h-5 text-primary shrink-0" />
