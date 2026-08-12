@@ -127,10 +127,12 @@ const ProductDetail = () => {
         );
     }
 
+    const varietyName = product?.variety_name || 'Rice Variety';
+
     const specs = [
-        { label: 'Process Type', value: product.processing || '100% Sortexed Steam / Raw' },
-        { label: 'Moisture Content', value: product.moisture || '12-14% Max' },
-        { label: 'Broken Percentage', value: product.variety_name.includes('Broken') ? (product.variety_name.includes('25%') ? '25% Broken' : '5% Broken') : '5% Max (Export Grade)' },
+        { label: 'Process Type', value: product?.processing || '100% Sortexed Steam / Raw' },
+        { label: 'Moisture Content', value: product?.moisture || '12-14% Max' },
+        { label: 'Broken Percentage', value: varietyName.includes('Broken') ? (varietyName.includes('25%') ? '25% Broken' : '5% Broken') : '5% Max (Export Grade)' },
         { label: 'Foreign Matter / Admixture', value: '0.1% Max' },
         { label: 'Crop Year', value: 'Current Season Crop' },
         { label: 'Origin', value: 'Miryalaguda, Telangana, India' },
@@ -156,14 +158,14 @@ const ProductDetail = () => {
                     <motion.div {...fadeUp} className="lg:col-span-5">
                         <div className="rounded-3xl overflow-hidden shadow-2xl border border-border/40 relative">
                             <OptimizedImage
-                                src={product.image_url}
-                                alt={product.variety_name}
+                                src={product?.image_url}
+                                alt={varietyName}
                                 className="w-full h-80 sm:h-96 object-cover"
                                 priority={true}
                                 aspectRatio="4/3"
                             />
                             <div className="absolute top-4 left-4 px-4 py-1.5 rounded-xl bg-background/90 backdrop-blur-md border border-border text-primary text-xs font-black tracking-wider uppercase shadow-md">
-                                {product.status === 'published' ? 'Active Export Stock' : 'Indicative Grade'}
+                                {product?.status === 'published' ? 'Active Export Stock' : 'Indicative Grade'}
                             </div>
                         </div>
                     </motion.div>
@@ -175,25 +177,25 @@ const ProductDetail = () => {
                                 Miryalaguda Canvassed Variety
                             </span>
                             <h1 className="text-3xl sm:text-4xl md:text-5xl font-display font-black text-text-main tracking-tight uppercase">
-                                {product.variety_name}
+                                {varietyName}
                             </h1>
                         </div>
 
                         <p className="text-text-muted font-bold text-base md:text-lg leading-relaxed">
-                            Premium export quality {product.variety_name} sourced directly through deep mill relationships in Nalgonda district. Tested for consistent grain length, optimal moisture, and zero discoloration.
+                            Premium export quality {varietyName} sourced directly through deep mill relationships in Nalgonda district. Tested for consistent grain length, optimal moisture, and zero discoloration.
                         </p>
 
                         {/* Price Card */}
                         <div className="premium-card !p-6 rounded-2xl border-primary/20 bg-primary/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                                 <span className="text-xs font-black text-text-muted uppercase tracking-wider block mb-1">
-                                    Indicative Market Rate ({product.price_basis || 'EX_MILL'} Miryalaguda)
+                                    Indicative Market Rate ({product?.price_basis || 'EX_MILL'} Miryalaguda)
                                 </span>
                                 <div className="flex items-baseline gap-2">
                                     <span className="text-3xl font-display font-black text-emerald">
-                                        ₹{product.current_price_mt ? product.current_price_mt.toLocaleString() : 'N/A'}
+                                        ₹{product?.current_price_mt ? Number(product.current_price_mt).toLocaleString() : 'N/A'}
                                     </span>
-                                    <span className="text-xs font-black text-text-muted">/ {product.unit || 'MT'} ({product.currency || 'INR'})</span>
+                                    <span className="text-xs font-black text-text-muted">/ {product?.unit || 'MT'} ({product?.currency || 'INR'})</span>
                                 </div>
                                 <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest mt-1">
                                     Rates subject to daily market fluctuations. Contact for binding quotation.
@@ -201,7 +203,7 @@ const ProductDetail = () => {
                             </div>
 
                             <Link
-                                to={`/contact?product=${encodeURIComponent(product.variety_name)}`}
+                                to={`/contact?product=${encodeURIComponent(varietyName)}`}
                                 className="button-primary !py-3.5 !px-6 text-sm whitespace-nowrap text-center"
                             >
                                 Request Proforma Quote
@@ -252,7 +254,7 @@ const ProductDetail = () => {
                     <p className="text-text-muted font-bold text-sm max-w-lg mx-auto mb-6">
                         Specify destination port, packaging requirement, and target tonnage to get an official proforma invoice.
                     </p>
-                    <Link to={`/contact?product=${encodeURIComponent(product.variety_name)}`} className="button-primary !py-4 !px-10 text-base">
+                    <Link to={`/contact?product=${encodeURIComponent(varietyName)}`} className="button-primary !py-4 !px-10 text-base">
                         Get Instant Quotation
                     </Link>
                 </motion.div>
