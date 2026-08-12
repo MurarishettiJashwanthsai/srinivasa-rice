@@ -1,19 +1,7 @@
 import { Link } from 'react-router-dom';
-import { Mail, Phone, MapPin, ArrowUpRight, Send } from 'lucide-react';
-import { useState } from 'react';
-import toast from 'react-hot-toast';
+import { Mail, Phone, MapPin, ArrowUpRight } from 'lucide-react';
 
 const Footer = () => {
-    const [email, setEmail] = useState('');
-
-    const handleNewsletter = (e) => {
-        e.preventDefault();
-        if (email) {
-            toast.success('Thank you for subscribing!');
-            setEmail('');
-        }
-    };
-
     const socialLinks = [
         {
             name: 'LinkedIn',
@@ -35,41 +23,12 @@ const Footer = () => {
         },
     ];
 
-    const certBadges = ['IEC', 'GST Registered', 'ISO 9001'];
+    const certBadges = ['IEC', 'GST Registered'];
 
     return (
         <footer className="relative bg-white dark:bg-[#050A14] text-text-main dark:text-white overflow-hidden transition-colors duration-500 border-t border-border dark:border-white/5" id="site-footer">
             {/* Decorative gradient line */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-emerald to-primary" />
-
-            {/* Newsletter Section */}
-            <div className="border-b border-border dark:border-white/10">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div className="text-center md:text-left">
-                            <h3 className="text-xl font-bold font-display mb-1">Stay Updated with Market Rates</h3>
-                            <p className="text-text-muted dark:text-gray-400 text-sm font-bold">Get daily price alerts and export intelligence directly to your inbox.</p>
-                        </div>
-                        <form onSubmit={handleNewsletter} className="flex w-full md:w-auto gap-2">
-                            <input
-                                type="email"
-                                required
-                                placeholder="your@email.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="flex-1 md:w-72 px-4 py-3 rounded-xl bg-surface-hover dark:bg-white/10 border border-border dark:border-white/10 text-text-main dark:text-white placeholder-text-subtle focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-sm font-bold"
-                            />
-                            <button
-                                type="submit"
-                                className="px-5 py-3 bg-primary hover:bg-primary-dark rounded-xl font-bold text-sm transition-all hover:scale-105 flex items-center gap-2 text-white"
-                            >
-                                <Send className="w-4 h-4" />
-                                <span className="hidden sm:inline">Subscribe</span>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
 
             {/* Main Footer Content */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">

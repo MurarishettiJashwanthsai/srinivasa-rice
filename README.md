@@ -23,8 +23,11 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies (fastapi, uvicorn, pydantic)
-pip install fastapi uvicorn pydantic
+# Install backend dependencies
+pip install -r requirements.txt
+
+# Create local configuration and replace every placeholder value
+cp .env.example .env
 
 # Run the server
 uvicorn main:app --reload
@@ -35,6 +38,10 @@ The FastAPI backend will start running at `http://localhost:8000`.
 To notify an external CRM or automation service when a lead is saved, set
 `LEAD_NOTIFICATION_WEBHOOK_URL` in `backend/.env`. If it is left empty, the
 lead is still saved and its notification status is recorded as `not_configured`.
+
+`SECRET_KEY`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` are required. Never commit
+their real values. If a credential has previously appeared in source control,
+rotate it in the hosting provider before deploying this revision.
 
 ### 2. Run the React Frontend
 The frontend uses Vite for ultra-fast development.

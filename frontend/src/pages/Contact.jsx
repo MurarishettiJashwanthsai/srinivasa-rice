@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Mail, Phone, MapPin, Send, MessageCircle, Clock, CheckCircle2, ChevronRight, FileText, Linkedin } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { countries } from '../data/countries';
@@ -279,6 +279,40 @@ const Contact = () => {
                                         </div>
                                     </div>
 
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="space-y-2">
+                                            <label htmlFor="destination_port" className="block text-xs font-black text-text-main uppercase tracking-widest">Destination Port</label>
+                                            <input
+                                                type="text"
+                                                id="destination_port"
+                                                name="destination_port"
+                                                value={formData.destination_port}
+                                                onChange={handleChange}
+                                                className={inputClass}
+                                                placeholder="e.g. Jebel Ali"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label htmlFor="packaging_type" className="block text-xs font-black text-text-main uppercase tracking-widest">Packaging</label>
+                                            <select id="packaging_type" name="packaging_type" value={formData.packaging_type} onChange={handleChange} className={inputClass}>
+                                                <option value="50kg PP Bag">50kg PP Bag</option>
+                                                <option value="26kg PP Bag">26kg PP Bag</option>
+                                                <option value="25kg Non-Woven Bag">25kg Non-Woven Bag</option>
+                                                <option value="Custom Packaging">Custom Packaging</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label htmlFor="incoterm" className="block text-xs font-black text-text-main uppercase tracking-widest">Trade Term</label>
+                                            <select id="incoterm" name="incoterm" value={formData.incoterm} onChange={handleChange} className={inputClass}>
+                                                <option value="FOB">FOB</option>
+                                                <option value="CIF">CIF</option>
+                                                <option value="CFR">CFR</option>
+                                                <option value="EXW">EXW / Ex-Mill</option>
+                                                <option value="Not sure">Not Sure</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
                                     <div className="space-y-2">
                                         <label htmlFor="inquiry" className="block text-xs font-black text-text-main uppercase tracking-widest">Requirement Details <span className="text-red-500">*</span></label>
                                         <textarea id="inquiry" name="inquiry" value={formData.inquiry} onChange={handleChange} required rows="4" className={`${inputClass} resize-none`} placeholder="Describe broken percentage, moisture preference, port of discharge..." />
@@ -289,7 +323,8 @@ const Contact = () => {
                                         <label className="flex items-start gap-3 cursor-pointer">
                                             <input type="checkbox" name="agree_privacy" checked={formData.agree_privacy} onChange={handleChange} required className="mt-1 w-4 h-4 rounded text-primary focus:ring-primary" />
                                             <span className="text-xs text-text-muted font-bold leading-relaxed">
-                                                I agree that Sri Srinivasa Canvassing may use these details to process and respond to my wholesale enquiry. <span className="text-red-500">*</span>
+                                                I agree that Sri Srinivasa Canvassing may use these details to process and respond to my wholesale enquiry under the{' '}
+                                                <Link to="/legal#privacy-policy" className="text-primary underline hover:no-underline">Privacy Policy</Link>. <span className="text-red-500">*</span>
                                             </span>
                                         </label>
                                         <label className="flex items-start gap-3 cursor-pointer">

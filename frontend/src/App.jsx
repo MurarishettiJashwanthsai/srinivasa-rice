@@ -40,6 +40,16 @@ const PageLoader = () => (
     </div>
 );
 
+const AdminPage = ({ children }) => (
+    <div className="min-h-screen bg-background font-sans">
+        <main id="main-content" tabIndex="-1">
+            <ErrorBoundary fallbackTitle="Administrative Page Unavailable">
+                <Suspense fallback={<PageLoader />}>{children}</Suspense>
+            </ErrorBoundary>
+        </main>
+    </div>
+);
+
 function App() {
     const [products, setProducts] = useState([]);
 
@@ -75,7 +85,13 @@ function App() {
                     </Suspense>
                 } />
 
-                {/* ── Main Website & Admin Portal Layout (with LiveTicker, Navbar, Footer) ── */}
+                {/* ── Standalone admin portal: intentionally excludes public navigation and widgets ── */}
+                <Route path="/admin/login" element={<AdminPage><AdminLogin /></AdminPage>} />
+                <Route path="/admin" element={<AdminPage><ProtectedRoute><AdminDashboard /></ProtectedRoute></AdminPage>} />
+                <Route path="/admin/crm" element={<AdminPage><ProtectedRoute><WhatsAppCRM /></ProtectedRoute></AdminPage>} />
+                <Route path="/admin/cards" element={<AdminPage><ProtectedRoute><CardEditor /></ProtectedRoute></AdminPage>} />
+
+                {/* ── Public website layout ── */}
                 <Route path="*" element={
                     <div className="min-h-screen flex flex-col font-sans relative">
                         <LiveTicker />
@@ -93,10 +109,6 @@ function App() {
                                         <Route path="/market-rates" element={<MarketDashboard />} />
                                         <Route path="/contact" element={<Contact />} />
                                         <Route path="/legal" element={<Legal />} />
-                                        <Route path="/admin/login" element={<AdminLogin />} />
-                                        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-                                        <Route path="/admin/crm" element={<ProtectedRoute><WhatsAppCRM /></ProtectedRoute>} />
-                                        <Route path="/admin/cards" element={<ProtectedRoute><CardEditor /></ProtectedRoute>} />
                                     </Routes>
                                 </Suspense>
                             </ErrorBoundary>

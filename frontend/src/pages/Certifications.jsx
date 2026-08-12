@@ -6,7 +6,7 @@ import useMeta from '../hooks/useMeta';
 const Certifications = () => {
     useMeta({
         title: 'Export Credentials & Mill Quality Standards',
-        description: 'View Sri Srinivasa Canvassing export registrations (APEDA, FSSAI, IEC) and partner milling facility certifications.',
+        description: 'View Sri Srinivasa Canvassing IEC and GST registration information alongside stated partner milling facility quality standards.',
     });
 
     const fadeUp = { initial: { opacity: 0, y: 30 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { duration: 0.6 } };
@@ -15,7 +15,7 @@ const Certifications = () => {
         { icon: FileCheck, title: 'IEC & GST Registered', entity: 'Sri Srinivasa Canvassing', desc: 'Authorized Import Export Code (IEC) holder registered with DGFT, India for official cross-border trade transactions.' },
     ];
 
-    const partnerMillCredentials = [
+    const MillCredentials = [
         { icon: Factory, title: 'ISO 9001:2015 Facilities', entity: 'Partner Millers', desc: 'Our canvassed milling partners in Miryalaguda maintain certified Quality Management Systems for raw paddy processing and sortex milling.' },
         { icon: CheckCircle, title: 'HACCP & ISO 22000', entity: 'Partner Millers', desc: 'Partner mills follow Hazard Analysis Critical Control Point (HACCP) systems ensuring clean processing, destoning, and moisture control.' },
         { icon: Building2, title: 'Bühler Sortex Facilities', entity: 'Partner Millers', desc: 'High-precision color sorting technology utilized at partner facilities to eliminate discolored grains and chalky kernels.' },
@@ -61,7 +61,7 @@ const Certifications = () => {
                     </motion.div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {partnerMillCredentials.map((cert, i) => (
+                        {MillCredentials.map((cert, i) => (
                             <GlassCard key={cert.title} variant="premium" delay={i * 0.1 + 0.3} className="flex flex-col">
                                 <div className="h-14 w-14 rounded-2xl bg-emerald/10 flex items-center justify-center mb-6 border border-emerald/20">
                                     <cert.icon className="h-7 w-7 text-emerald" />

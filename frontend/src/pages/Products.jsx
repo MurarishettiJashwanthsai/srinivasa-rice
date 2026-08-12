@@ -10,8 +10,8 @@ import { API_BASE_URL } from '../config/api';
 
 const Products = () => {
     useMeta({
-        title: 'Bulk Rice Varieties for Export — Sona Masuri, Basmati, IR64',
-        description: 'Browse export-grade Sona Masuri, Basmati, RNR, IR64, and JSR rice varieties sourced directly from Miryalaguda mills.',
+        title: 'Bulk Rice Varieties — Sona Masuri, RNR and JSR',
+        description: 'Browse currently listed Sona Masuri, RNR and JSR rice varieties sourced through selected Miryalaguda milling facilities.',
     });
 
     const [products, setProducts] = useState([]);

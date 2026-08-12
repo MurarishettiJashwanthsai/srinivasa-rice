@@ -119,7 +119,7 @@ const Home = () => {
                         </h1>
 
                         <p className="text-sm md:text-base lg:text-lg text-text-muted max-w-3xl mx-auto mb-10 font-bold leading-relaxed">
-                            Sona Masuri, Basmati, RNR, IR64 and JSR rice sourced from selected Telangana mills with quality inspection, custom packaging, and export-logistics support.
+                            Sona Masuri, RNR and JSR rice sourced from selected Telangana mills with quality inspection, custom packaging, and export-logistics support.
                         </p>
 
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-5">

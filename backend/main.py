@@ -1,5 +1,7 @@
 import datetime
+import hmac
 import os
+import secrets
 import jwt
 from fastapi import FastAPI, HTTPException, Depends, status, File, UploadFile, Form
 from pydantic import BaseModel
@@ -18,19 +20,29 @@ import httpx
 from database import engine, Base, get_db
 from models import RicePrice, Lead
 
-SECRET_KEY = os.getenv("SECRET_KEY", "ss_canvassing_secure_jwt_secret_2026")
+SECRET_KEY = os.getenv("SECRET_KEY", "").strip()
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY must be configured in the backend environment")
+
 ALGORITHM = "HS256"
+ACCESS_TOKEN_HOURS = int(os.getenv("ACCESS_TOKEN_HOURS", "8"))
 
 # Security scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/admin/login")
 
-# Cloudinary Configuration
-cloudinary.config( 
-    cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME", "df948lfrf"), 
-    api_key = os.getenv("CLOUDINARY_API_KEY", "748133643683359"), 
-    api_secret = os.getenv("CLOUDINARY_API_SECRET", "qocSWo8jUw6vCa36QRs7vsRCVtk"),
-    secure = True
-)
+# Cloudinary is optional. Local fallback storage remains available when it is not configured.
+CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()
+CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "").strip()
+CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "").strip()
+CLOUDINARY_ENABLED = all((CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET))
+
+if CLOUDINARY_ENABLED:
+    cloudinary.config(
+        cloud_name=CLOUDINARY_CLOUD_NAME,
+        api_key=CLOUDINARY_API_KEY,
+        api_secret=CLOUDINARY_API_SECRET,
+        secure=True,
+    )
 
 import re
 
@@ -232,14 +244,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
-        expected_user = os.getenv("ADMIN_USERNAME", "srinivasulu@srinivascanvassing.com").lower()
+        expected_user = os.getenv("ADMIN_USERNAME", "").strip().lower()
         if not username or not isinstance(username, str) or username.lower() != expected_user:
             raise credentials_exception
         return username
     except jwt.PyJWTError:
         raise credentials_exception
 
-import secrets
 from models import RateAuditLog
 
 # --- Models ---
@@ -285,11 +296,26 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     username = form_data.username.strip().lower()
     password = form_data.password.strip()
     
-    expected_user = os.getenv("ADMIN_USERNAME", "srinivasulu@srinivascanvassing.com").lower()
-    expected_pass = os.getenv("ADMIN_PASSWORD", "Manocha")
+    expected_user = os.getenv("ADMIN_USERNAME", "").strip().lower()
+    expected_pass = os.getenv("ADMIN_PASSWORD", "")
+
+    if not expected_user or not expected_pass:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Administrative authentication is not configured",
+        )
     
-    if username == expected_user and password == expected_pass:
-        access_token = jwt.encode({"sub": expected_user}, SECRET_KEY, algorithm=ALGORITHM)
+    if hmac.compare_digest(username, expected_user) and hmac.compare_digest(password, expected_pass):
+        now = datetime.datetime.now(datetime.timezone.utc)
+        access_token = jwt.encode(
+            {
+                "sub": expected_user,
+                "iat": now,
+                "exp": now + datetime.timedelta(hours=ACCESS_TOKEN_HOURS),
+            },
+            SECRET_KEY,
+            algorithm=ALGORITHM,
+        )
         return {"access_token": access_token, "token_type": "bearer"}
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -322,13 +348,14 @@ async def get_prices(db: Session = Depends(get_db)):
 
 async def save_image_file(image: UploadFile) -> Optional[str]:
     # Primary: Upload to Cloudinary
-    try:
-        image.file.seek(0)
-        upload_result = cloudinary.uploader.upload(image.file, folder="rice_products")
-        if upload_result and upload_result.get("secure_url"):
-            return upload_result.get("secure_url")
-    except Exception as e:
-        print(f"Cloudinary upload note: {e}")
+    if CLOUDINARY_ENABLED:
+        try:
+            image.file.seek(0)
+            upload_result = cloudinary.uploader.upload(image.file, folder="rice_products")
+            if upload_result and upload_result.get("secure_url"):
+                return upload_result.get("secure_url")
+        except Exception as e:
+            print(f"Cloudinary upload note: {e}")
 
     # Fallback: Save to local uploads directory
     try:

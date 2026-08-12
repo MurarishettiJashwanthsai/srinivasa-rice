@@ -1,4 +1,9 @@
+import os
 import pytest
+
+os.environ.setdefault("SECRET_KEY", "test-only-secret-key-that-is-not-used-in-production")
+os.environ.setdefault("ADMIN_USERNAME", "admin@example.test")
+os.environ.setdefault("ADMIN_PASSWORD", "test-only-admin-password")
 from fastapi.testclient import TestClient
 from main import app
 from database import Base, engine, SessionLocal
@@ -82,7 +87,7 @@ def test_admin_login_and_price_update_audit():
     # Login
     login_resp = client.post(
         "/api/admin/login",
-        data={"username": "srinivasulu@srinivascanvassing.com", "password": "Manocha"}
+        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]}
     )
     assert login_resp.status_code == 200
     token = login_resp.json()["access_token"]
@@ -119,7 +124,7 @@ def test_product_slug_lookup():
 def test_unusual_rate_warning():
     login_resp = client.post(
         "/api/admin/login",
-        data={"username": "srinivasulu@srinivascanvassing.com", "password": "Manocha"}
+        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]}
     )
     token = login_resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
