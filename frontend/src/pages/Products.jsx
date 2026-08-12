@@ -1,26 +1,39 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { ArrowRight, FileText } from 'lucide-react';
 import GlassCard from '../components/GlassCard';
 import { SkeletonCard } from '../components/SkeletonLoader';
+import { OptimizedImage } from '../components/OptimizedImage';
 import useMeta from '../hooks/useMeta';
+import { API_BASE_URL } from '../config/api';
 
 const Products = () => {
     useMeta({
-        title: 'Bulk Rice Varieties for Export',
-        description: 'View available Sona Masuri, RNR and JSR rice varieties, specifications and packaging options.',
+        title: 'Bulk Rice Varieties for Export — Sona Masuri, Basmati, IR64',
+        description: 'Browse export-grade Sona Masuri, Basmati, RNR, IR64, and JSR rice varieties sourced directly from Miryalaguda mills.',
     });
 
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [fetchFailed, setFetchFailed] = useState(false);
 
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://srinivasa-rice.onrender.com'}/api/products`);
-                if (response.ok) setProducts(await response.json());
-            } catch (error) { console.error('Failed to fetch products', error); }
-            finally { setLoading(false); }
+                const response = await fetch(`${API_BASE_URL}/api/products`);
+                if (response.ok) {
+                    const data = await response.json();
+                    setProducts(data);
+                } else {
+                    setFetchFailed(true);
+                }
+            } catch (error) { 
+                console.error('Failed to fetch products', error); 
+                setFetchFailed(true);
+            } finally { 
+                setLoading(false); 
+            }
         };
         fetchProducts();
     }, []);
@@ -35,47 +48,80 @@ const Products = () => {
     const fadeUp = { initial: { opacity: 0, y: 30 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { duration: 0.6 } };
 
     return (
-        <div className="bg-background dark:bg-secondary pt-6 pb-10 min-h-screen">
+        <div className="bg-background dark:bg-secondary pt-6 pb-16 min-h-screen font-sans">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <motion.div {...fadeUp} className="text-center mb-8">
-                    <h1 className="text-2xl md:text-3xl font-display font-extrabold text-text-main dark:text-white tracking-tight mb-3">Our Premium Catalog</h1>
-                    <div className="w-12 h-1 bg-primary mx-auto rounded-full mb-4" />
-                    <p className="max-w-xl mx-auto text-base text-text-muted dark:text-gray-400">Sourced directly from certified millers in Miryalaguda. Available in bulk quantities for immediate export.</p>
+                <motion.div {...fadeUp} className="text-center mb-10">
+                    <h1 className="text-3xl md:text-4xl font-display font-black text-text-main dark:text-white tracking-tight mb-3 uppercase">Export Variety Catalogue</h1>
+                    <div className="w-16 h-1 bg-primary mx-auto rounded-full mb-4" />
+                    <p className="max-w-2xl mx-auto text-base text-text-muted dark:text-gray-400 font-bold leading-relaxed">
+                        Sourced directly from selected milling facilities in Miryalaguda. Tested for moisture, admixture, and grain purity. Available in bulk containers.
+                    </p>
                 </motion.div>
 
                 {loading ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
                     </div>
+                ) : fetchFailed ? (
+                    <div className="p-8 rounded-3xl bg-surface-hover/30 border border-border text-center space-y-4 max-w-xl mx-auto">
+                        <p className="text-text-muted font-bold text-base">Current product information is temporarily unavailable. Please contact us for direct availability.</p>
+                        <Link to="/contact" className="button-primary inline-flex !py-3 !px-6 text-sm">Contact Canvassing Desk</Link>
+                    </div>
                 ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                        {products.map((product, index) => (
-                            <GlassCard key={product.id} variant="premium" delay={index * 0.08} className="!p-0 overflow-hidden flex flex-col md:flex-row group">
-                                <div className="md:w-2/5 h-48 md:h-auto overflow-hidden">
-                                    <img
-                                        src={product.image_url ? (product.image_url.startsWith('http') ? product.image_url : `${import.meta.env.VITE_API_URL || 'https://srinivasa-rice.onrender.com'}/${product.image_url}`) : defaultImages[index % defaultImages.length]}
-                                        alt={product.variety_name}
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                        loading="lazy"
-                                    />
-                                </div>
-                                <div className="md:w-3/5 p-6 flex flex-col justify-between">
-                                    <div>
-                                        <h3 className="text-2xl font-display font-bold text-text-main dark:text-white mb-2">{product.variety_name}</h3>
-                                        <p className="text-text-muted dark:text-gray-400 mb-4 text-sm leading-relaxed">Premium quality {product.variety_name} rice ready for global export. Contact us for detailed COA and exact specifications.</p>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {products.map((product, index) => {
+                            const pSlug = product.slug || product.variety_name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                            const imgSrc = product.image_url ? (product.image_url.startsWith('http') ? product.image_url : `${API_BASE_URL}/${product.image_url}`) : defaultImages[index % defaultImages.length];
+
+                            return (
+                                <GlassCard key={product.id} variant="premium" delay={index * 0.06} className="!p-0 overflow-hidden flex flex-col md:flex-row group">
+                                    <div className="md:w-2/5 h-52 md:h-auto overflow-hidden relative">
+                                        <OptimizedImage
+                                            src={imgSrc}
+                                            alt={product.variety_name}
+                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                        />
                                     </div>
-                                    <div className="premium-card !p-4 rounded-xl mb-4 !transform-none !shadow-none">
-                                        <div className="flex justify-between items-center">
-                                            <h4 className="text-xs font-bold text-text-muted dark:text-gray-400 uppercase tracking-wider">Live Estimate</h4>
-                                            <span className="text-sm font-bold text-emerald bg-emerald/10 px-3 py-1 rounded-lg border border-emerald/20">₹{product.current_price_mt.toFixed(2)} / MT</span>
+                                    <div className="md:w-3/5 p-6 flex flex-col justify-between">
+                                        <div>
+                                            <div className="flex justify-between items-start mb-1">
+                                                <h3 className="text-xl font-display font-black text-text-main dark:text-white uppercase tracking-tight">{product.variety_name}</h3>
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20">
+                                                    Export Grade
+                                                </span>
+                                            </div>
+                                            <p className="text-text-muted dark:text-gray-400 mb-4 text-xs font-bold leading-relaxed">
+                                                Miryalaguda sourced {product.variety_name} rice. 100% sortexed with verified moisture and grain specifications.
+                                            </p>
+                                        </div>
+
+                                        <div className="premium-card !p-3.5 rounded-xl mb-4 !transform-none !shadow-none bg-surface-hover/30">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[10px] font-black text-text-muted dark:text-gray-400 uppercase tracking-wider">Indicative Rate (Ex-Mill)</span>
+                                                <span className="text-sm font-black text-emerald bg-emerald/10 px-3 py-1 rounded-lg border border-emerald/20">
+                                                    ₹{product.current_price_mt ? product.current_price_mt.toLocaleString() : 'N/A'} / MT
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Link 
+                                                to={`/products/${pSlug}`} 
+                                                className="w-full py-2.5 px-3 rounded-xl border border-border text-text-main dark:text-white font-bold text-xs hover:border-primary text-center flex items-center justify-center gap-1 transition-all"
+                                            >
+                                                <FileText className="w-3.5 h-3.5 text-primary" /> View Specs
+                                            </Link>
+                                            <Link 
+                                                to={`/contact?product=${encodeURIComponent(product.variety_name)}`} 
+                                                className="w-full py-2.5 px-3 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold text-xs text-center flex items-center justify-center gap-1 transition-all"
+                                            >
+                                                Quote <ArrowRight className="w-3.5 h-3.5" />
+                                            </Link>
                                         </div>
                                     </div>
-                                    <Link to="/contact" className="block text-center w-full bg-secondary dark:bg-primary hover:bg-secondary-dark dark:hover:bg-primary-dark text-white font-semibold py-2.5 rounded-xl transition-colors text-sm">
-                                        Request Specs & Final Quote
-                                    </Link>
-                                </div>
-                            </GlassCard>
-                        ))}
+                                </GlassCard>
+                            );
+                        })}
                     </div>
                 )}
             </div>

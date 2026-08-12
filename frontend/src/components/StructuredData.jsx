@@ -40,6 +40,9 @@ export const StructuredData = ({ products = [] }) => {
                 'postalCode': '508207',
                 'addressCountry': 'IN',
             },
+            'sameAs': [
+                'https://www.linkedin.com/in/murarishetti-srinivasulu/',
+            ],
         });
 
         // WebSite Schema
@@ -86,32 +89,53 @@ export const StructuredData = ({ products = [] }) => {
             });
         }
 
-        // Product Catalog Schema for /products or homepage catalog
-        if ((location.pathname === '/products' || location.pathname === '/') && Array.isArray(products) && products.length > 0) {
+        // Product Catalog Schema for /products or homepage catalog or /products/:slug
+        if ((location.pathname.startsWith('/products') || location.pathname === '/') && Array.isArray(products) && products.length > 0) {
             products.forEach((prod) => {
                 if (prod && prod.variety_name) {
-                    schemas.push({
-                        '@context': 'https://schema.org',
-                        '@type': 'Product',
-                        'name': prod.variety_name,
-                        'description': `${prod.variety_name} sourced from Miryalaguda. ${prod.processing || '100% Sortexed'}, Moisture: ${prod.moisture || '12-14% Max'}.`,
-                        'brand': {
-                            '@type': 'Brand',
-                            'name': 'Sri Srinivasa Canvassing',
-                        },
-                        'offers': {
-                            '@type': 'Offer',
-                            'priceCurrency': 'INR',
-                            'price': prod.current_price_mt,
-                            'priceValidUntil': new Date(Date.now() + 86400000).toISOString().split('T')[0],
-                            'itemCondition': 'https://schema.org/NewCondition',
-                            'availability': 'https://schema.org/InStock',
-                            'seller': {
-                                '@type': 'Organization',
+                    const prodSlug = prod.slug || prod.variety_name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                    const isSpecificProduct = location.pathname === `/products/${prodSlug}`;
+
+                    // If on catalog page, include all products; if on specific product detail page, include that specific product schema
+                    if (!location.pathname.includes('/products/') || isSpecificProduct) {
+                        schemas.push({
+                            '@context': 'https://schema.org',
+                            '@type': 'Product',
+                            '@id': `${DOMAIN}/products/${prodSlug}#product`,
+                            'url': `${DOMAIN}/products/${prodSlug}`,
+                            'name': prod.variety_name,
+                            'description': `${prod.variety_name} sourced from Miryalaguda. ${prod.processing || '100% Sortexed'}, Moisture: ${prod.moisture || '12-14% Max'}. Indicative export rate from Telangana rice hub.`,
+                            'image': prod.image_url ? (prod.image_url.startsWith('http') ? prod.image_url : `${DOMAIN}/${prod.image_url}`) : `${DOMAIN}/logo.png`,
+                            'brand': {
+                                '@type': 'Brand',
                                 'name': 'Sri Srinivasa Canvassing',
                             },
-                        },
-                    });
+                            'offers': {
+                                '@type': 'Offer',
+                                'priceCurrency': 'INR',
+                                'price': prod.current_price_mt,
+                                'priceValidUntil': new Date(Date.now() + 86400000).toISOString().split('T')[0],
+                                'itemCondition': 'https://schema.org/NewCondition',
+                                'availability': 'https://schema.org/InStock',
+                                'seller': {
+                                    '@type': 'Organization',
+                                    'name': 'Sri Srinivasa Canvassing',
+                                },
+                                'priceSpecification': {
+                                    '@type': 'UnitPriceSpecification',
+                                    'price': prod.current_price_mt,
+                                    'priceCurrency': 'INR',
+                                    'unitCode': 'TNE',
+                                    'valueAddedTaxIncluded': false,
+                                    'referenceQuantity': {
+                                        '@type': 'QuantitativeValue',
+                                        'value': '1',
+                                        'unitCode': 'TNE'
+                                    }
+                                }
+                            },
+                        });
+                    }
                 }
             });
         }

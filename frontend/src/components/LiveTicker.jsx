@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { API_BASE_URL } from '../config/api';
 
 const LiveTicker = () => {
     const [prices, setPrices] = useState([]);
@@ -7,7 +8,7 @@ const LiveTicker = () => {
     useEffect(() => {
         const fetchPrices = async () => {
             try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://srinivasa-rice.onrender.com'}/api/products`);
+                const response = await fetch(`${API_BASE_URL}/api/products`);
                 if (response.ok) {
                     const data = await response.json();
                     setPrices(data);

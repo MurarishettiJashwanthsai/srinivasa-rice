@@ -31,6 +31,13 @@ cloudinary.config(
     secure = True
 )
 
+import re
+
+def slugify(text_val: str) -> str:
+    text_val = text_val.lower()
+    text_val = re.sub(r'[^a-z0-9]+', '-', text_val)
+    return text_val.strip('-')
+
 def init_db():
     from migrate_db import run_migration
     run_migration()
@@ -45,33 +52,61 @@ def init_db():
             db.rollback()
             rice_count = 0
 
-        if rice_count == 0:
-            seed_data = [
-                ("Sona Masuri Steam", 850.0, 840.0, 1.19, "up"),
-                ("Sona Masuri Raw", 830.0, 830.0, 0.0, "neutral"),
-                ("Sona Masuri Parboiled", 800.0, 810.0, -1.23, "down"),
-                ("Swarna", 650.0, 645.0, 0.78, "up"),
-                ("IR64 5% Broken", 550.0, 560.0, -1.79, "down"),
-                ("IR64 25% Broken", 510.0, 510.0, 0.0, "neutral"),
-                ("BPT 5204", 720.0, 715.0, 0.70, "up"),
-                ("1121 Basmati Sella", 1200.0, 1180.0, 1.69, "up"),
-                ("1121 Basmati Steam", 1250.0, 1260.0, -0.79, "down"),
-                ("1509 Basmati", 1100.0, 1100.0, 0.0, "neutral"),
-            ]
-            
-            current_time = datetime.datetime.now().isoformat()
-            
-            for item in seed_data:
+        seed_data = [
+            ("Sona Masuri Steam(BPT)", 5500.0, 5450.0, 0.92, "up"),
+            ("Sona Masuri Raw(BPT)", 5600.0, 5550.0, 0.90, "up"),
+            ("lachikari raw rice(JSR)", 7900.0, 7850.0, 0.64, "up"),
+            ("RNR Steam", 5950.0, 5900.0, 0.85, "up"),
+            ("Jsr Steem Rice", 6470.0, 6400.0, 1.09, "up"),
+        ]
+        
+        current_time = datetime.datetime.now().isoformat()
+        target_names = {item[0] for item in seed_data}
+        existing_products = {p.variety_name: p for p in db.query(RicePrice).all()}
+        
+        db_changed = False
+        # Remove any products not in target list
+        for name, prod in existing_products.items():
+            if name not in target_names and not name.startswith("Sona Masuri Steam(BPT)") and not name.startswith("Sona Masuri Raw(BPT)"):
+                db.delete(prod)
+                db_changed = True
+
+        for item in seed_data:
+            name, curr_price, prev_price, change, trend = item
+            if name in existing_products:
+                prod = existing_products[name]
+                if prod.current_price_mt != curr_price:
+                    prod.current_price_mt = curr_price
+                    prod.previous_price_mt = prev_price
+                    prod.percentage_change = change
+                    prod.trend = trend
+                    prod.last_updated = current_time
+                    db_changed = True
+            else:
                 new_rice = RicePrice(
-                    variety_name=item[0],
-                    current_price_mt=item[1],
-                    previous_price_mt=item[2],
-                    percentage_change=item[3],
-                    trend=item[4],
-                    last_updated=current_time
+                    variety_name=name,
+                    slug=slugify(name),
+                    current_price_mt=curr_price,
+                    previous_price_mt=prev_price,
+                    percentage_change=change,
+                    trend=trend,
+                    last_updated=current_time,
+                    status="published"
                 )
                 db.add(new_rice)
+                db_changed = True
                 
+        if db_changed:
+            db.commit()
+
+        # Ensure all existing products have a slug
+        existing = db.query(RicePrice).all()
+        updated = False
+        for item in existing:
+            if not item.slug:
+                item.slug = slugify(item.variety_name)
+                updated = True
+        if updated:
             db.commit()
 
         try:
@@ -202,7 +237,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
-        if not username or not isinstance(username, str) or username != "srinivasulu@srinivascanvassing.com":
+        expected_user = os.getenv("ADMIN_USERNAME", "srinivasulu@srinivascanvassing.com").lower()
+        if not username or not isinstance(username, str) or username.lower() != expected_user:
             raise credentials_exception
         return username
     except jwt.PyJWTError:
@@ -238,6 +274,13 @@ class ProductUpdate(BaseModel):
     moisture: Optional[str] = None
     processing: Optional[str] = None
     reason: Optional[str] = "Routine Market Update"
+    confirm_unusual_rate: Optional[bool] = False
+    status: Optional[str] = None
+    price_basis: Optional[str] = None
+    currency: Optional[str] = None
+    unit: Optional[str] = None
+    public_note: Optional[str] = None
+    internal_note: Optional[str] = None
 
 # --- Routes ---
 
@@ -263,6 +306,18 @@ async def get_products(db: Session = Depends(get_db)):
     """Alias for getting all products"""
     products = db.query(RicePrice).order_by(RicePrice.id.asc()).all()
     return products
+
+@app.get("/api/products/slug/{slug}")
+async def get_product_by_slug(slug: str, db: Session = Depends(get_db)):
+    norm_slug = slug.lower().strip()
+    product = db.query(RicePrice).filter(RicePrice.slug == norm_slug).first()
+    if not product:
+        all_prods = db.query(RicePrice).all()
+        for p in all_prods:
+            if slugify(p.variety_name) == norm_slug:
+                return p
+        raise HTTPException(status_code=404, detail="Product variety not found")
+    return product
 
 # Keep /api/prices backward compatibility
 @app.get("/api/prices")
@@ -293,6 +348,7 @@ async def add_product(
     try:
         new_rice = RicePrice(
             variety_name=name,
+            slug=slugify(name),
             current_price_mt=initial_price,
             previous_price_mt=initial_price,
             percentage_change=0.0,
@@ -301,6 +357,7 @@ async def add_product(
             image_url=image_url,
             moisture=moisture,
             processing=processing,
+            status="published",
             updated_by=current_user
         )
         db.add(new_rice)
@@ -347,6 +404,12 @@ async def update_product(
     else:
         percentage_change = 0.0
         
+    if abs(percentage_change) > 20.0 and not product.confirm_unusual_rate:
+        raise HTTPException(
+            status_code=400,
+            detail=f"UNUSUAL RATE WARNING: Price change of {percentage_change:+.2f}% exceeds the 20% variance threshold. Verify currency ({product.currency or row.currency or 'INR'}), unit ({product.unit or row.unit or 'MT'}), and price basis ({product.price_basis or row.price_basis or 'EX_MILL'}) before publishing."
+        )
+
     if current_price > previous_price:
         trend = "up"
     elif current_price < previous_price:
@@ -358,6 +421,7 @@ async def update_product(
     
     try:
         row.variety_name = variety_name
+        row.slug = slugify(variety_name)
         row.current_price_mt = current_price
         row.previous_price_mt = previous_price
         row.percentage_change = round(percentage_change, 2)
@@ -369,6 +433,18 @@ async def update_product(
             row.moisture = product.moisture
         if product.processing is not None:
             row.processing = product.processing
+        if product.status is not None:
+            row.status = product.status
+        if product.price_basis is not None:
+            row.price_basis = product.price_basis
+        if product.currency is not None:
+            row.currency = product.currency
+        if product.unit is not None:
+            row.unit = product.unit
+        if product.public_note is not None:
+            row.public_note = product.public_note
+        if product.internal_note is not None:
+            row.internal_note = product.internal_note
             
         db.commit()
         db.refresh(row)
@@ -393,13 +469,15 @@ async def update_product(
     return {
         "id": row.id,
         "variety_name": row.variety_name,
+        "slug": row.slug,
         "current_price_mt": row.current_price_mt,
         "previous_price_mt": row.previous_price_mt,
         "percentage_change": row.percentage_change,
         "trend": row.trend,
         "last_updated": row.last_updated,
         "moisture": row.moisture,
-        "processing": row.processing
+        "processing": row.processing,
+        "status": row.status
     }
 
 @app.delete("/api/products/delete/{id}")
@@ -416,18 +494,19 @@ async def delete_product(
     audit = RateAuditLog(
         rate_id=row.id,
         variety_name=row.variety_name,
-        action="DELETE",
+        action="ARCHIVE",
         old_price=row.current_price_mt,
         new_price=0.0,
         admin_user=current_user,
-        reason="Product Deleted",
+        reason="Product Soft Archived",
         timestamp=current_time
     )
     db.add(audit)
 
-    db.delete(row)
+    # Soft archive instead of hard drop
+    row.status = "archived"
     db.commit()
-    return {"message": "Variety deleted successfully"}
+    return {"message": "Variety soft archived successfully"}
 
 @app.post("/api/contact")
 async def handle_contact(form_data: ContactForm, db: Session = Depends(get_db)):

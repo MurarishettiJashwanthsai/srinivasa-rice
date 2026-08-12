@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Mail, Phone, MapPin, Send, MessageCircle, Clock, CheckCircle2, ChevronRight, FileText } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Mail, Phone, MapPin, Send, MessageCircle, Clock, CheckCircle2, ChevronRight, FileText, Linkedin } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { countries } from '../data/countries';
 import useMeta from '../hooks/useMeta';
@@ -7,9 +8,12 @@ import { API_BASE_URL } from '../config/api';
 
 const Contact = () => {
     useMeta({
-        title: 'Request a Bulk Rice Quote',
+        title: 'Request a Bulk Rice Quote — Sri Srinivasa Canvassing',
         description: 'Submit your required rice variety, quantity, packaging and destination to request specifications and an official quotation.',
     });
+
+    const [searchParams] = useSearchParams();
+    const initialProduct = searchParams.get('product') || 'Sona Masuri Steam';
 
     const [formData, setFormData] = useState({
         name: '',
@@ -18,7 +22,7 @@ const Contact = () => {
         whatsapp: '',
         destination_country: '',
         destination_port: '',
-        product_name: 'Sona Masuri Steam',
+        product_name: initialProduct,
         quantity_mt: '',
         packaging_type: '50kg PP Bag',
         incoterm: 'FOB',
@@ -27,6 +31,13 @@ const Contact = () => {
         agree_privacy: false,
         subscribe_alerts: false,
     });
+
+    useEffect(() => {
+        const prodParam = searchParams.get('product');
+        if (prodParam) {
+            setFormData(prev => ({ ...prev, product_name: prodParam }));
+        }
+    }, [searchParams]);
 
     const [countryCode, setCountryCode] = useState('+91');
     const [status, setStatus] = useState(null);
@@ -103,6 +114,7 @@ const Contact = () => {
         { icon: MapPin, title: 'Miryalaguda Head Office', detail: 'Miryalaguda, Nalgonda District, Telangana, India - 508207' },
         { icon: Phone, title: 'Telephone & WhatsApp', detail: '+91 9866760028', link: 'https://wa.me/919866760028', linkText: 'Chat on WhatsApp' },
         { icon: Mail, title: 'Business Email', detail: 'srinivasulu@srinivascanvassing.com', link: 'mailto:srinivasulu@srinivascanvassing.com', linkText: 'Send Email' },
+        { icon: Linkedin, title: 'LinkedIn Profile', detail: 'Murarishetti Srinivasulu', link: 'https://www.linkedin.com/in/murarishetti-srinivasulu/', linkText: 'Connect on LinkedIn' },
         { icon: Clock, title: 'Operating Hours', detail: 'Monday – Saturday: 9:00 AM – 8:00 PM IST' }
     ];
 
@@ -227,13 +239,11 @@ const Contact = () => {
                                         <div className="space-y-2">
                                             <label htmlFor="product_name" className="block text-xs font-black text-text-main uppercase tracking-widest">Rice Variety</label>
                                             <select id="product_name" name="product_name" value={formData.product_name} onChange={handleChange} className={inputClass}>
-                                                <option value="Sona Masuri Steam">Sona Masuri Steam</option>
-                                                <option value="Sona Masuri Raw">Sona Masuri Raw</option>
-                                                <option value="Sona Masuri Parboiled">Sona Masuri Parboiled</option>
-                                                <option value="RNR 15048">RNR 15048 (Sugar Free)</option>
-                                                <option value="JSR Rice">JSR Rice</option>
-                                                <option value="Swarna">Swarna Rice</option>
-                                                <option value="IR64 5% Broken">IR64 5% Broken</option>
+                                                <option value="Sona Masuri Steam(BPT)">Sona Masuri Steam(BPT)</option>
+                                                <option value="Sona Masuri Raw(BPT)">Sona Masuri Raw(BPT)</option>
+                                                <option value="lachikari raw rice(JSR)">lachikari raw rice(JSR)</option>
+                                                <option value="RNR Steam">RNR Steam</option>
+                                                <option value="Jsr Steem Rice">Jsr Steem Rice</option>
                                                 <option value="Other / Multiple">Other / Multiple</option>
                                             </select>
                                         </div>

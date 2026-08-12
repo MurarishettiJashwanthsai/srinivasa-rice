@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import GlassCard from '../components/GlassCard';
 import { countries } from '../data/countries';
+import { API_BASE_URL } from '../config/api';
 
 const Home = () => {
     const [name, setName] = useState('');
@@ -16,7 +17,7 @@ const Home = () => {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://srinivasa-rice.onrender.com'}/api/products`);
+                const res = await fetch(`${API_BASE_URL}/api/products`);
                 if (res.ok) setProducts(await res.json());
             } catch (e) { console.error(e); }
         };
@@ -28,7 +29,7 @@ const Home = () => {
         setLoading(true);
         try {
             const fullNumber = `${countryCode}${whatsapp}`;
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://srinivasa-rice.onrender.com'}/api/contact`, {
+            const response = await fetch(`${API_BASE_URL}/api/contact`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -68,7 +69,7 @@ const Home = () => {
                 <div className="absolute inset-0 z-0">
                     <img 
                         src="https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80" 
-                        alt="Rice Grains Background" 
+                        alt="Miryalaguda Rice Grains Processing" 
                         className="w-full h-full object-cover opacity-30 dark:opacity-40 grayscale-[0.5] dark:grayscale-0"
                     />
                     <div className="absolute inset-0 bg-background/40 dark:bg-black/60" />
@@ -83,16 +84,15 @@ const Home = () => {
                     >
                         <h1 className="mb-6 select-none">
                             <span className="block text-2xl md:text-3xl lg:text-4xl font-bold text-text-main mb-2">
-                                Premium <span className="text-primary">Rice</span>
+                                Canvassing & Export Merchant Desk
                             </span>
-                            <span className="block text-3xl md:text-5xl lg:text-[4.8rem] font-black text-text-main w-full mx-auto leading-tight tracking-tight">
-                                Sourced Directly from <br className="hidden lg:block" /> Telangana's Finest Mills
+                            <span className="block text-3xl md:text-5xl lg:text-[4.5rem] font-black text-text-main w-full mx-auto leading-tight tracking-tight uppercase">
+                                Bulk Rice Sourcing <br className="hidden lg:block" /> from Miryalaguda, India
                             </span>
                         </h1>
 
                         <p className="text-sm md:text-base lg:text-lg text-text-muted max-w-3xl mx-auto mb-10 font-bold leading-relaxed">
-                            Sourcing the finest quality rice from the heartland of India to <br className="hidden md:block" /> 
-                            global markets. Trusted canvassers and merchant exporters.
+                            Sona Masuri, Basmati, RNR, IR64 and JSR rice sourced from selected Telangana mills with quality inspection, custom packaging, and export-logistics support.
                         </p>
 
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-5">
@@ -100,7 +100,7 @@ const Home = () => {
                                 Request Bulk Quote <ArrowRight className="w-5 h-5" />
                             </Link>
                             <Link to="/products" className="w-full sm:w-auto px-8 py-3.5 rounded-xl border border-border bg-card text-text-main font-bold hover:border-primary transition-all">
-                                View Products
+                                View Rice Specifications
                             </Link>
                         </div>
                     </motion.div>
@@ -112,26 +112,37 @@ const Home = () => {
                 <motion.div {...fadeUp} className="max-w-6xl mx-auto relative overflow-hidden rounded-3xl premium-card !bg-primary/5 border-primary/10">
                     <div className="relative z-10 px-6 sm:px-10 py-16 text-center">
                         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-black mb-6 uppercase tracking-widest">
-                            <MessageCircle className="w-4 h-4" /> Live Market Feed
+                            <MessageCircle className="w-4 h-4" /> Live Market Intelligence
                         </div>
-                        <h2 className="text-3xl md:text-5xl font-display font-black text-text-main mb-4 leading-tight">Wholesale Prices Change Daily!</h2>
-                        <p className="text-text-muted text-lg max-w-2xl mx-auto mb-10 font-bold">Get tomorrow's exact CIF/FOB loading rates sent directly to your WhatsApp. Never miss a market drop.</p>
+                        <h2 className="text-3xl md:text-5xl font-display font-black text-text-main mb-4 leading-tight uppercase">Daily Miryalaguda Market Rates</h2>
+                        <p className="text-text-muted text-lg max-w-2xl mx-auto mb-10 font-bold">Receive the latest indicative market rates and availability updates directly to your WhatsApp.</p>
                         
-                        <form onSubmit={handleSubscribe} className="max-w-4xl mx-auto flex flex-col lg:flex-row gap-3 justify-center items-stretch">
-                            <input 
-                                type="text" 
-                                required 
-                                placeholder="Your Name" 
-                                value={name} 
-                                onChange={(e) => setName(e.target.value)} 
-                                className="input-premium lg:w-48 !bg-black/20" 
-                            />
-                            <div className="flex flex-row gap-2 lg:flex-grow">
+                        <form onSubmit={handleSubscribe} method="POST" className="max-w-4xl mx-auto flex flex-col lg:flex-row gap-3 justify-center items-stretch">
+                            <div className="text-left space-y-1 lg:w-48">
+                                <label htmlFor="alert-name" className="sr-only">Full Name</label>
+                                <input 
+                                    id="alert-name"
+                                    name="name"
+                                    type="text" 
+                                    required 
+                                    maxLength="100"
+                                    autoComplete="name"
+                                    placeholder="Your Name" 
+                                    value={name} 
+                                    onChange={(e) => setName(e.target.value)} 
+                                    className="input-premium w-full !bg-black/20" 
+                                />
+                            </div>
+                            <div className="flex flex-row gap-2 lg:flex-grow text-left">
                                 <div className="relative w-24 sm:w-32 shrink-0">
+                                    <label htmlFor="alert-country" className="sr-only">Country Code</label>
                                     <select 
+                                        id="alert-country"
+                                        name="country_code"
                                         value={countryCode}
                                         onChange={(e) => setCountryCode(e.target.value)}
                                         className="input-premium h-full pl-4 pr-8 py-4 !bg-black/20 font-black cursor-pointer appearance-none text-sm"
+                                        aria-label="Country Dial Code"
                                     >
                                         {countries.map((c) => (
                                             <option key={`${c.name}-${c.code}`} value={c.code} className="bg-secondary text-white">
@@ -143,14 +154,21 @@ const Home = () => {
                                         <ChevronRight className="w-4 h-4 text-primary rotate-90" />
                                     </div>
                                 </div>
-                                <input 
-                                    type="tel" 
-                                    required 
-                                    placeholder="WhatsApp Number" 
-                                    value={whatsapp} 
-                                    onChange={(e) => setWhatsapp(e.target.value)} 
-                                    className="input-premium flex-grow min-w-[200px] !bg-black/20" 
-                                />
+                                <div className="flex-grow min-w-[200px]">
+                                    <label htmlFor="alert-whatsapp" className="sr-only">WhatsApp Number</label>
+                                    <input 
+                                        id="alert-whatsapp"
+                                        name="whatsapp"
+                                        type="tel" 
+                                        required 
+                                        maxLength="20"
+                                        autoComplete="tel-national"
+                                        placeholder="WhatsApp Number" 
+                                        value={whatsapp} 
+                                        onChange={(e) => setWhatsapp(e.target.value)} 
+                                        className="input-premium w-full !bg-black/20" 
+                                    />
+                                </div>
                             </div>
                             <button type="submit" disabled={loading} className="button-primary lg:w-48 shrink-0">
                                 {loading ? '...' : <><span>Get Alerts</span><Send className="w-4 h-4" /></>}
@@ -164,29 +182,39 @@ const Home = () => {
             <section className="py-20 px-4 bg-secondary-bg" id="product-showcase">
                 <div className="max-w-7xl mx-auto">
                     <motion.div {...fadeUp} className="text-center mb-16">
-                        <h2 className="text-4xl md:text-5xl font-display font-black text-text-main mb-4">Premium Rice Catalog</h2>
+                        <h2 className="text-4xl md:text-5xl font-display font-black text-text-main mb-4 uppercase">Export Variety Catalogue</h2>
                         <div className="w-20 h-1.5 bg-primary mx-auto rounded-full mb-6" />
                         <p className="text-text-muted text-lg max-w-2xl mx-auto font-bold">Sourced directly from certified millers in Miryalaguda. Available in bulk quantities for immediate export.</p>
                     </motion.div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                        {(products.length > 0 ? products.slice(0, 8) : []).map((product, i) => (
-                            <div key={product.id} className="premium-card group overflow-hidden flex flex-col">
-                                <div className="h-56 overflow-hidden relative">
-                                    <img src={product.image_url ? (product.image_url.startsWith('http') ? product.image_url : `${import.meta.env.VITE_API_URL || 'https://srinivasa-rice.onrender.com'}/${product.image_url}`) : defaultImages[i % defaultImages.length]} alt={product.variety_name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" />
-                                    <div className="absolute bottom-4 left-4 px-4 py-2 rounded-xl bg-background/90 backdrop-blur-md text-primary text-sm font-black shadow-xl">₹{product.current_price_mt}/MT</div>
-                                </div>
-                                <div className="p-6 flex-grow flex flex-col">
-                                    <h3 className="font-display font-black text-xl text-text-main mb-3">{product.variety_name}</h3>
-                                    <p className="text-text-muted text-sm mb-6 line-clamp-2 font-bold">Premium export quality with rigorous QC testing. Contact for technical specifications.</p>
-                                    <div className="mt-auto pt-6 border-t border-border flex items-center justify-between">
-                                        <Link to="/contact" className="text-primary font-black text-sm hover:underline flex items-center gap-1">
-                                            Request Quote <ArrowRight className="w-4 h-4" />
-                                        </Link>
-                                        <span className="text-[10px] uppercase tracking-widest text-text-muted font-black">Export Grade</span>
+                        {(products.length > 0 ? products.slice(0, 8) : []).map((product, i) => {
+                            const pSlug = product.slug || product.variety_name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                            return (
+                                <div key={product.id} className="premium-card group overflow-hidden flex flex-col">
+                                    <div className="h-56 overflow-hidden relative">
+                                        <img 
+                                            src={product.image_url ? (product.image_url.startsWith('http') ? product.image_url : `${API_BASE_URL}/${product.image_url}`) : defaultImages[i % defaultImages.length]} 
+                                            alt={product.variety_name} 
+                                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                                            loading="lazy" 
+                                        />
+                                        <div className="absolute bottom-4 left-4 px-4 py-2 rounded-xl bg-background/90 backdrop-blur-md text-primary text-sm font-black shadow-xl">
+                                            ₹{product.current_price_mt}/MT
+                                        </div>
+                                    </div>
+                                    <div className="p-6 flex-grow flex flex-col">
+                                        <h3 className="font-display font-black text-xl text-text-main mb-3">{product.variety_name}</h3>
+                                        <p className="text-text-muted text-sm mb-6 line-clamp-2 font-bold">Premium export quality with rigorous QC testing. Contact for technical specifications.</p>
+                                        <div className="mt-auto pt-6 border-t border-border flex items-center justify-between">
+                                            <Link to={`/products/${pSlug}`} className="text-primary font-black text-sm hover:underline flex items-center gap-1">
+                                                View Specs <ArrowRight className="w-4 h-4" />
+                                            </Link>
+                                            <span className="text-[10px] uppercase tracking-widest text-text-muted font-black">Export Grade</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             </section>

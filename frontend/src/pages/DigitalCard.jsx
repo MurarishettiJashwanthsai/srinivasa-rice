@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Phone, Mail, MapPin, Globe, Download, Share2, MessageCircle } from 'lucide-react';
+import { Phone, Mail, MapPin, Globe, Download, Share2, MessageCircle, Linkedin } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion } from 'framer-motion';
 
@@ -49,6 +49,7 @@ const DigitalCard = () => {
                     specialization: 'Sona Masuri, Basmati, IR64 — Bulk Export',
                     location: 'Miryalaguda, Telangana, India',
                     website: 'https://www.srinivascanvassing.com',
+                    linkedin: 'https://www.linkedin.com/in/murarishetti-srinivasulu/',
                     slug: 'srinivasulu',
                 };
 
@@ -244,6 +245,7 @@ const DigitalCard = () => {
                             { icon: Mail, value: card.email, href: `mailto:${card.email}` },
                             { icon: MapPin, value: card.location || 'Miryalaguda, Telangana, India', href: null },
                             ...(card.website ? [{ icon: Globe, value: card.website.replace(/https?:\/\//, ''), href: card.website }] : []),
+                            ...(card.linkedin ? [{ icon: Linkedin, value: 'LinkedIn Profile', href: card.linkedin }] : []),
                         ].map((item) => (
                             <div key={item.value}
                                 className="flex items-center gap-3 px-4 py-3 rounded-xl"

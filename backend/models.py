@@ -23,6 +23,9 @@ class RicePrice(Base):
     updated_by: Mapped[Optional[str]] = mapped_column(String, default="system", nullable=True)
     last_updated: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     image_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    slug: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)
+    review_status: Mapped[Optional[str]] = mapped_column(String, default="approved", nullable=True)
+    reviewed_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     moisture: Mapped[Optional[str]] = mapped_column(String, default="12-14% Max", nullable=True)
     processing: Mapped[Optional[str]] = mapped_column(String, default="100% Sortexed", nullable=True)
 

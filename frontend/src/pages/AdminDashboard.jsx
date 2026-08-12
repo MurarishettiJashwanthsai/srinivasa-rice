@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { LogOut, Trash2, Plus, Edit2, Check, X, ImagePlus, Users, MessageSquareShare, MessageCircle, CreditCard, Search, Building2, Phone, Calendar, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import { API_BASE_URL } from '../config/api';
 
 const INITIAL_LEADS = [
     {
@@ -93,15 +94,20 @@ const AdminDashboard = () => {
 
     const navigate = useNavigate();
     const token = localStorage.getItem('admin_token');
-    const API = import.meta.env.VITE_API_URL || 'https://srinivasa-rice.onrender.com';
+    const API = API_BASE_URL;
 
     const fetchProducts = useCallback(async () => {
-        try { const res = await fetch(`${API}/api/products`); if (res.ok) setProducts(await res.json()); } catch { toast.error('Failed to load products'); }
+        try { 
+            const res = await fetch(`${API}/api/products?t=${Date.now()}`); 
+            if (res.ok) setProducts(await res.json()); 
+        } catch { 
+            toast.error('Failed to load products'); 
+        }
     }, [API]);
 
     const fetchLeads = useCallback(async () => {
         try {
-            const res = await fetch(`${API}/api/leads`, { headers: { Authorization: `Bearer ${token}` } });
+            const res = await fetch(`${API}/api/leads?t=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } });
             if (res.ok) {
                 const data = await res.json();
                 setLeads(data.length > 0 ? data : INITIAL_LEADS);
@@ -138,23 +144,74 @@ const AdminDashboard = () => {
         if (newImage) formData.append('image', newImage);
         try {
             const res = await fetch(`${API}/api/products/add`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData });
-            if (res.ok) { toast.success(`${newVariety.name} added`); setNewVariety({ name: '', initial_price: '' }); setNewImage(null); const fi = document.getElementById('new-image-input'); if (fi) fi.value = ''; fetchProducts(); }
-            else { const err = await res.json(); toast.error(err.detail || 'Failed'); }
+            if (res.ok) { 
+                const added = await res.json();
+                toast.success(`${newVariety.name} added`); 
+                setNewVariety({ name: '', initial_price: '' }); 
+                setNewImage(null); 
+                const fi = document.getElementById('new-image-input'); 
+                if (fi) fi.value = ''; 
+                setProducts(prev => [...prev.filter(p => p.id !== added.id), added]);
+                fetchProducts(); 
+            } else if (res.status === 401) {
+                toast.error('Session expired. Please log in again.');
+                handleLogout();
+            } else { 
+                const err = await res.json(); 
+                toast.error(err.detail || 'Failed'); 
+            }
         } catch { toast.error('Network error'); }
     };
 
-    const handleSaveUpdate = async (id) => {
+    const handleSaveUpdate = async (id, confirmUnusual = true) => {
         try {
-            const res = await fetch(`${API}/api/products/update/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: editName, new_price_mt: parseFloat(editPrice) }) });
-            if (res.ok) { toast.success(`${editName} updated`); setEditingId(null); fetchProducts(); } else toast.error('Failed to update');
-        } catch { toast.error('Network error'); }
+            const res = await fetch(`${API}/api/products/update/${id}`, { 
+                method: 'PUT', 
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
+                body: JSON.stringify({ 
+                    name: editName, 
+                    new_price_mt: parseFloat(editPrice),
+                    confirm_unusual_rate: confirmUnusual
+                }) 
+            });
+            if (res.ok) { 
+                const updated = await res.json();
+                toast.success(`${editName} updated successfully`); 
+                setEditingId(null); 
+                setProducts(prev => prev.map(p => p.id === id ? updated : p));
+                fetchProducts(); 
+            } else if (res.status === 401) {
+                toast.error('Session expired. Please log in again.');
+                handleLogout();
+            } else {
+                const data = await res.json();
+                if (data.detail && (data.detail.includes('20% variance threshold') || data.detail.includes('UNUSUAL RATE WARNING') || data.detail.includes('variance exceeds'))) {
+                    if (window.confirm(`${data.detail}\n\nAre you sure you want to force save this price change?`)) {
+                        handleSaveUpdate(id, true);
+                        return;
+                    }
+                }
+                toast.error(data.detail || 'Failed to update product rate');
+            }
+        } catch { 
+            toast.error('Network error updating product'); 
+        }
     };
 
     const handleDelete = async (id, name) => {
-        if (!window.confirm(`Remove ${name}?`)) return;
+        if (!window.confirm(`Archive ${name}? This will hide the variety from public view while preserving historical records.`)) return;
         try {
             const res = await fetch(`${API}/api/products/delete/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-            if (res.ok) { toast.success(`${name} deleted`); fetchProducts(); } else toast.error('Failed');
+            if (res.ok) { 
+                toast.success(`${name} archived successfully`); 
+                setProducts(prev => prev.filter(p => p.id !== id));
+                fetchProducts(); 
+            } else if (res.status === 401) {
+                toast.error('Session expired. Please log in again.');
+                handleLogout();
+            } else {
+                toast.error('Failed to archive variety');
+            }
         } catch { toast.error('Network error'); }
     };
 
@@ -163,7 +220,18 @@ const AdminDashboard = () => {
         const formData = new FormData(); formData.append('image', file);
         try {
             const res = await fetch(`${API}/api/products/${id}/image`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData });
-            if (res.ok) { toast.success('Image updated'); fetchProducts(); } else { const err = await res.json(); toast.error(err.detail || 'Failed'); }
+            if (res.ok) { 
+                const updated = await res.json();
+                toast.success('Product image updated'); 
+                setProducts(prev => prev.map(p => p.id === id ? updated : p));
+                fetchProducts(); 
+            } else if (res.status === 401) {
+                toast.error('Session expired. Please log in again.');
+                handleLogout();
+            } else { 
+                const err = await res.json(); 
+                toast.error(err.detail || 'Failed'); 
+            }
         } catch { toast.error('Network error'); }
     };
 

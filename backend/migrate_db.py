@@ -18,6 +18,9 @@ def run_migration():
         ("rice_prices", "image_url", "VARCHAR"),
         ("rice_prices", "moisture", "VARCHAR DEFAULT '12-14% Max'"),
         ("rice_prices", "processing", "VARCHAR DEFAULT '100% Sortexed'"),
+        ("rice_prices", "slug", "VARCHAR"),
+        ("rice_prices", "review_status", "VARCHAR DEFAULT 'approved'"),
+        ("rice_prices", "reviewed_by", "VARCHAR"),
         ("leads", "request_id", "VARCHAR"),
         ("leads", "email", "VARCHAR"),
         ("leads", "destination_country", "VARCHAR"),
@@ -31,10 +34,9 @@ def run_migration():
         ("leads", "created_at", "VARCHAR"),
     ]
 
-    for table, col, col_type in columns_to_add:
-        with engine.begin() as conn:
+    with engine.begin() as conn:
+        for table, col, col_type in columns_to_add:
             try:
-                # Check PostgreSQL information_schema to prevent transaction aborts
                 if engine.dialect.name == "postgresql":
                     check_sql = text("SELECT 1 FROM information_schema.columns WHERE table_name=:table AND column_name=:col")
                     res = conn.execute(check_sql, {"table": table, "col": col}).fetchone()
@@ -42,8 +44,8 @@ def run_migration():
                         continue
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
                 print(f"Added column {col} to {table}")
-            except Exception as e:
-                print(f"Migration note for {table}.{col}: {e}")
+            except Exception:
+                pass
 
 if __name__ == "__main__":
     run_migration()

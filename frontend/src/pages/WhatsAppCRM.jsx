@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, FileText, Megaphone, BarChart3, Search, Send, Tag, Phone, ArrowLeft, Users, Clock, ChevronRight, Copy } from 'lucide-react';
+import { API_BASE_URL } from '../config/api';
 
-const API = import.meta.env.VITE_API_URL || 'https://srinivasa-rice.onrender.com';
+const API = API_BASE_URL;
 
 const INITIAL_LEADS = [
     {

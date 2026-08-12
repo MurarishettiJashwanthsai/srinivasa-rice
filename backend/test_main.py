@@ -4,10 +4,13 @@ from main import app
 from database import Base, engine, SessionLocal
 from models import RicePrice, Lead, RateAuditLog
 
+from migrate_db import run_migration
+
 client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def setup_test_db():
+    run_migration()
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
@@ -83,7 +86,8 @@ def test_admin_login_and_price_update_audit():
     # Update Price
     update_payload = {
         "new_price_mt": 890.0,
-        "reason": "Test Price Audit Entry"
+        "reason": "Test Price Audit Entry",
+        "confirm_unusual_rate": True
     }
     update_resp = client.put(f"/api/products/update/{prod_id}", json=update_payload, headers=headers)
     assert update_resp.status_code == 200
@@ -96,3 +100,42 @@ def test_admin_login_and_price_update_audit():
     logs = logs_resp.json()
     assert len(logs) > 0
     assert logs[0]["action"] == "UPDATE"
+
+def test_product_slug_lookup():
+    response = client.get("/api/products/slug/sona-masuri-steam")
+    if response.status_code == 200:
+        data = response.json()
+        assert "variety_name" in data
+
+def test_unusual_rate_warning():
+    login_resp = client.post(
+        "/api/admin/login",
+        data={"username": "srinivasulu@srinivascanvassing.com", "password": "Manocha"}
+    )
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    prods = client.get("/api/products").json()
+    prod_id = prods[0]["id"]
+    current_price = prods[0]["current_price_mt"]
+    spike_price = current_price * 1.5  # 50% price jump
+
+    # Large price spike without confirm should return 400 Warning
+    spike_payload = {
+        "new_price_mt": spike_price,
+        "reason": "Test Spike Warning",
+        "confirm_unusual_rate": False
+    }
+    spike_resp = client.put(f"/api/products/update/{prod_id}", json=spike_payload, headers=headers)
+    assert spike_resp.status_code == 400
+    assert "UNUSUAL RATE WARNING" in spike_resp.json()["detail"]
+
+    # Large price spike with confirm_unusual_rate=True should succeed
+    confirm_payload = {
+        "new_price_mt": spike_price,
+        "reason": "Confirmed Test Spike",
+        "confirm_unusual_rate": True
+    }
+    confirm_resp = client.put(f"/api/products/update/{prod_id}", json=confirm_payload, headers=headers)
+    assert confirm_resp.status_code == 200
+

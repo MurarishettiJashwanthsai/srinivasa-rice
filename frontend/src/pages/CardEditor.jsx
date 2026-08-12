@@ -13,7 +13,7 @@ const CardEditor = () => {
         const saved = localStorage.getItem('digital_cards');
         if (saved) return JSON.parse(saved);
         return [
-            { id: 1, name: 'Srinivasulu', designation: 'Managing Director', phone: '+91 9866760028', email: 'srinivasulu@srinivascanvassing.com', specialization: 'Sona Masuri, Basmati, IR64', slug: 'srinivasulu' }
+            { id: 1, name: 'Srinivasulu', designation: 'Managing Director', phone: '+91 9866760028', email: 'srinivasulu@srinivascanvassing.com', specialization: 'Sona Masuri, Basmati, IR64', linkedin: 'https://www.linkedin.com/in/murarishetti-srinivasulu/', slug: 'srinivasulu' }
         ];
     });
 
@@ -28,6 +28,7 @@ const CardEditor = () => {
         phone: '', 
         email: '', 
         specialization: '', 
+        linkedin: '',
         slug: '' 
     });
 
@@ -39,6 +40,7 @@ const CardEditor = () => {
             phone: card.phone, 
             email: card.email, 
             specialization: card.specialization, 
+            linkedin: card.linkedin || '',
             slug: card.slug || '' 
         });
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -172,6 +174,16 @@ const CardEditor = () => {
                                     />
                                 </div>
                                 <div className="md:col-span-2 space-y-2">
+                                    <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">LinkedIn Profile URL</label>
+                                    <input 
+                                        type="url" 
+                                        value={formData.linkedin} 
+                                        onChange={e => setFormData({ ...formData, linkedin: e.target.value })} 
+                                        placeholder="https://www.linkedin.com/in/murarishetti-srinivasulu/" 
+                                        className="input-premium !bg-black/20 !py-3 !text-base" 
+                                    />
+                                </div>
+                                <div className="md:col-span-2 space-y-2">
                                     <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">URL Slug (Personalized Link)</label>
                                     <div className="flex items-center gap-2">
                                         <span className="text-white/20 font-bold text-sm select-none">/card/</span>
@@ -193,7 +205,7 @@ const CardEditor = () => {
                                     {editingCard && (
                                         <button 
                                             type="button"
-                                            onClick={() => { setEditingCard(null); setFormData({ name: '', designation: '', phone: '', email: '', specialization: '', slug: '' }); }}
+                                            onClick={() => { setEditingCard(null); setFormData({ name: '', designation: '', phone: '', email: '', specialization: '', linkedin: '', slug: '' }); }}
                                             className="w-full mt-3 py-3 border-2 border-white/5 rounded-2xl text-white/40 font-black uppercase tracking-widest text-xs hover:bg-white/5 transition-all"
                                         >
                                             Abort Refactor

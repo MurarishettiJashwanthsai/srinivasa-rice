@@ -18,6 +18,7 @@ import { API_BASE_URL } from './config/api';
 // Lazy loaded pages for code splitting
 const About = lazy(() => import('./pages/About'));
 const Products = lazy(() => import('./pages/Products'));
+const ProductDetail = lazy(() => import('./pages/ProductDetail'));
 const Packaging = lazy(() => import('./pages/Packaging'));
 const Certifications = lazy(() => import('./pages/Certifications'));
 const Contact = lazy(() => import('./pages/Contact'));
@@ -67,14 +68,14 @@ function App() {
                 }}
             />
             <Routes>
-                {/* ── Standalone: Digital Card (no Navbar/Footer) ── */}
+                {/* ── Standalone: Digital Business Card (no Navbar/Footer) ── */}
                 <Route path="/card/:slug" element={
                     <Suspense fallback={<PageLoader />}>
                         <DigitalCard />
                     </Suspense>
                 } />
 
-                {/* ── Full layout: all other pages ── */}
+                {/* ── Main Website & Admin Portal Layout (with LiveTicker, Navbar, Footer) ── */}
                 <Route path="*" element={
                     <div className="min-h-screen flex flex-col font-sans relative">
                         <LiveTicker />
@@ -86,6 +87,7 @@ function App() {
                                         <Route path="/" element={<Home />} />
                                         <Route path="/about" element={<About />} />
                                         <Route path="/products" element={<Products />} />
+                                        <Route path="/products/:slug" element={<ProductDetail />} />
                                         <Route path="/packaging" element={<Packaging />} />
                                         <Route path="/certifications" element={<Certifications />} />
                                         <Route path="/market-rates" element={<MarketDashboard />} />
