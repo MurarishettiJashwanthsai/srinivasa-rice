@@ -2,6 +2,7 @@ import datetime
 import hmac
 import os
 import secrets
+import warnings
 import jwt
 from fastapi import FastAPI, HTTPException, Depends, status, File, UploadFile, Form
 from pydantic import BaseModel
@@ -22,7 +23,13 @@ from models import RicePrice, Lead
 
 SECRET_KEY = os.getenv("SECRET_KEY", "").strip()
 if not SECRET_KEY:
-    raise RuntimeError("SECRET_KEY must be configured in the backend environment")
+    SECRET_KEY = secrets.token_urlsafe(48)
+    warnings.warn(
+        "SECRET_KEY is not configured; using an ephemeral key. "
+        "Set SECRET_KEY in Render to keep admin sessions valid across restarts.",
+        RuntimeWarning,
+        stacklevel=1,
+    )
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_HOURS = int(os.getenv("ACCESS_TOKEN_HOURS", "8"))

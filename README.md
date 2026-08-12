@@ -39,9 +39,12 @@ To notify an external CRM or automation service when a lead is saved, set
 `LEAD_NOTIFICATION_WEBHOOK_URL` in `backend/.env`. If it is left empty, the
 lead is still saved and its notification status is recorded as `not_configured`.
 
-`SECRET_KEY`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` are required. Never commit
-their real values. If a credential has previously appeared in source control,
-rotate it in the hosting provider before deploying this revision.
+`ADMIN_USERNAME` and `ADMIN_PASSWORD` are required for administrative sign-in.
+`SECRET_KEY` should always be configured in production; if it is missing, the
+service uses a secure ephemeral key so it can start, but admin sessions become
+invalid whenever the service restarts. Never commit real secret values. If a
+credential has previously appeared in source control, rotate it in the hosting
+provider before deploying this revision.
 
 ### 2. Run the React Frontend
 The frontend uses Vite for ultra-fast development.
