@@ -9,7 +9,7 @@ import { API_BASE_URL } from '../config/api';
 const Contact = () => {
     useMeta({
         title: 'Request a Bulk Rice Quote — Sri Srinivasa Canvassing',
-        description: 'Submit your required rice variety, quantity, packaging and destination to request specifications and an official quotation.',
+        description: 'Submit your required rice variety, quantity and packaging to request specifications and an official quotation.',
     });
 
     const [searchParams] = useSearchParams();
@@ -20,12 +20,9 @@ const Contact = () => {
         company: '',
         email: '',
         whatsapp: '',
-        destination_country: '',
-        destination_port: '',
         product_name: initialProduct,
         quantity_mt: '',
         packaging_type: '50kg PP Bag',
-        incoterm: 'FOB',
         inquiry: '',
         honeypot: '',
         agree_privacy: false,
@@ -70,12 +67,9 @@ const Contact = () => {
                 company: formData.company,
                 email: formData.email,
                 whatsapp: fullNumber,
-                destination_country: formData.destination_country,
-                destination_port: formData.destination_port,
                 product_name: formData.product_name,
                 quantity_mt: formData.quantity_mt ? parseFloat(formData.quantity_mt) : null,
                 packaging_type: formData.packaging_type,
-                incoterm: formData.incoterm,
                 inquiry: `${formData.inquiry}${formData.subscribe_alerts ? ' | Opted in for Daily Price Alerts' : ''}`,
                 honeypot: formData.honeypot,
                 source_page: 'contact'
@@ -143,7 +137,7 @@ const Contact = () => {
                 <motion.div {...fadeUp} className="text-center mb-8 md:mb-12">
                     <h1 className="text-3xl md:text-5xl font-display font-black text-text-main tracking-tight mb-3 uppercase">Request Bulk Quote</h1>
                     <div className="w-16 md:w-20 h-1.5 bg-primary mx-auto rounded-full mb-4 md:mb-5" />
-                    <p className="max-w-2xl mx-auto text-base md:text-lg text-text-muted font-bold leading-relaxed px-2">Request official rice specifications, proforma quotations, and global port logistics information directly from our canvassing team.</p>
+                    <p className="max-w-2xl mx-auto text-base md:text-lg text-text-muted font-bold leading-relaxed px-2">Request official rice specifications, packaging information, and proforma quotations directly from our canvassing team.</p>
                 </motion.div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 md:gap-16">
@@ -259,10 +253,6 @@ const Contact = () => {
 
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div className="space-y-2">
-                                            <label htmlFor="destination_country" className="block text-xs font-black text-text-main uppercase tracking-widest">Destination Country</label>
-                                            <input type="text" id="destination_country" name="destination_country" value={formData.destination_country} onChange={handleChange} className={inputClass} placeholder="e.g. UAE, Benin" />
-                                        </div>
-                                        <div className="space-y-2">
                                             <label htmlFor="product_name" className="block text-xs font-black text-text-main uppercase tracking-widest">Rice Variety</label>
                                             <select id="product_name" name="product_name" value={formData.product_name} onChange={handleChange} className={inputClass}>
                                                 <option value="Sona Masuri Steam(BPT)">Sona Masuri Steam(BPT)</option>
@@ -277,21 +267,6 @@ const Contact = () => {
                                             <label htmlFor="quantity_mt" className="block text-xs font-black text-text-main uppercase tracking-widest">Quantity (MT)</label>
                                             <input type="number" min="1" id="quantity_mt" name="quantity_mt" value={formData.quantity_mt} onChange={handleChange} className={inputClass} placeholder="e.g. 50" />
                                         </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="space-y-2">
-                                            <label htmlFor="destination_port" className="block text-xs font-black text-text-main uppercase tracking-widest">Destination Port</label>
-                                            <input
-                                                type="text"
-                                                id="destination_port"
-                                                name="destination_port"
-                                                value={formData.destination_port}
-                                                onChange={handleChange}
-                                                className={inputClass}
-                                                placeholder="e.g. Jebel Ali"
-                                            />
-                                        </div>
                                         <div className="space-y-2">
                                             <label htmlFor="packaging_type" className="block text-xs font-black text-text-main uppercase tracking-widest">Packaging</label>
                                             <select id="packaging_type" name="packaging_type" value={formData.packaging_type} onChange={handleChange} className={inputClass}>
@@ -301,21 +276,11 @@ const Contact = () => {
                                                 <option value="Custom Packaging">Custom Packaging</option>
                                             </select>
                                         </div>
-                                        <div className="space-y-2">
-                                            <label htmlFor="incoterm" className="block text-xs font-black text-text-main uppercase tracking-widest">Trade Term</label>
-                                            <select id="incoterm" name="incoterm" value={formData.incoterm} onChange={handleChange} className={inputClass}>
-                                                <option value="FOB">FOB</option>
-                                                <option value="CIF">CIF</option>
-                                                <option value="CFR">CFR</option>
-                                                <option value="EXW">EXW / Ex-Mill</option>
-                                                <option value="Not sure">Not Sure</option>
-                                            </select>
-                                        </div>
                                     </div>
 
                                     <div className="space-y-2">
                                         <label htmlFor="inquiry" className="block text-xs font-black text-text-main uppercase tracking-widest">Requirement Details <span className="text-red-500">*</span></label>
-                                        <textarea id="inquiry" name="inquiry" value={formData.inquiry} onChange={handleChange} required rows="4" className={`${inputClass} resize-none`} placeholder="Describe broken percentage, moisture preference, port of discharge..." />
+                                        <textarea id="inquiry" name="inquiry" value={formData.inquiry} onChange={handleChange} required rows="4" className={`${inputClass} resize-none`} placeholder="Describe broken percentage, moisture preference, delivery timing, or other requirements..." />
                                     </div>
 
                                     {/* Consent Checkboxes */}
