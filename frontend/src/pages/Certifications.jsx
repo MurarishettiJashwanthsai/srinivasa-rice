@@ -57,7 +57,7 @@ const Certifications = () => {
                 <div>
                     <motion.div {...fadeUp} className="mb-8">
                         <span className="text-xs font-black uppercase tracking-[0.25em] text-primary block mb-1">Industrial Processing Network</span>
-                        <h2 className="text-2xl font-display font-black text-text-main dark:text-white uppercase tracking-tight">Partner Mill Infrastructure Standards</h2>
+                        <h2 className="text-2xl font-display font-black text-text-main dark:text-white uppercase tracking-tight">Mill Infrastructure Standards</h2>
                     </motion.div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

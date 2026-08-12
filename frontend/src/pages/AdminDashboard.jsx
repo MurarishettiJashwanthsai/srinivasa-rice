@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { LogOut, Trash2, Plus, Edit2, Check, X, ImagePlus, Users, MessageSquareShare, MessageCircle, CreditCard, Search, Building2, Phone, Calendar, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import { LogOut, Trash2, Plus, Edit2, Check, X, ImagePlus, Users, MessageSquareShare, MessageCircle, CreditCard, Search, Building2, Phone, Calendar, MessageSquare, ChevronDown, ChevronUp, Bell, BellRing } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
+import useInquiryNotifications from '../hooks/useInquiryNotifications';
 
 const INITIAL_LEADS = [
     {
@@ -95,6 +96,13 @@ const AdminDashboard = () => {
     const navigate = useNavigate();
     const token = localStorage.getItem('admin_token');
     const API = API_BASE_URL;
+    const {
+        browserNotificationPermission,
+        clearUnreadInquiries,
+        enableBrowserNotifications,
+        processLeadUpdate,
+        unreadInquiryCount,
+    } = useInquiryNotifications();
 
     const fetchProducts = useCallback(async () => {
         try { 
@@ -110,6 +118,7 @@ const AdminDashboard = () => {
             const res = await fetch(`${API}/api/leads?t=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } });
             if (res.ok) {
                 const data = await res.json();
+                processLeadUpdate(data);
                 setLeads(data.length > 0 ? data : INITIAL_LEADS);
             } else {
                 setLeads(INITIAL_LEADS);
@@ -117,13 +126,21 @@ const AdminDashboard = () => {
         } catch {
             setLeads(INITIAL_LEADS);
         }
-    }, [API, token]);
+    }, [API, token, processLeadUpdate]);
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchProducts();
-        fetchLeads();
-    }, [fetchProducts, fetchLeads]);
+    }, [fetchProducts]);
+
+    useEffect(() => {
+        const initialLeadFetch = window.setTimeout(fetchLeads, 0);
+        const leadPollingInterval = window.setInterval(fetchLeads, 30000);
+        return () => {
+            window.clearTimeout(initialLeadFetch);
+            window.clearInterval(leadPollingInterval);
+        };
+    }, [fetchLeads]);
 
     const generateBroadcast = () => {
         const date = new Date().toLocaleDateString('en-IN');
@@ -246,7 +263,21 @@ const AdminDashboard = () => {
                         <h1 className="text-3xl font-display font-bold text-text-main dark:text-white">Admin Dashboard</h1>
                         <p className="text-sm text-text-muted dark:text-gray-400 mt-1">Manage live market rates and global inquiries.</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={enableBrowserNotifications}
+                            className="relative flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary font-semibold text-sm border border-primary/20 hover:bg-primary/20 transition-all"
+                            title="Enable browser alerts for newly received inquiries"
+                        >
+                            {browserNotificationPermission === 'granted' ? <BellRing className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+                            {browserNotificationPermission === 'granted' ? 'Notifications On' : 'Enable Notifications'}
+                            {unreadInquiryCount > 0 && (
+                                <span className="min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center">
+                                    {unreadInquiryCount}
+                                </span>
+                            )}
+                        </button>
                         <Link to="/admin/crm" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald/10 text-emerald font-semibold text-sm border border-emerald/20 hover:bg-emerald/20 transition-all">
                             <MessageCircle className="w-4 h-4" /> WhatsApp CRM
                         </Link>
@@ -262,7 +293,7 @@ const AdminDashboard = () => {
                 {/* Tabs */}
                 <div className="flex gap-1 p-1 bg-surface dark:bg-secondary-light/30 rounded-2xl mb-8 border border-border dark:border-white/10">
                     {[{ id: 'inventory', label: 'Live Inventory', icon: Plus }, { id: 'leads', label: `Inquiries & CRM (${leads.length})`, icon: Users }].map(tab => (
-                        <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all ${activeTab === tab.id ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'text-text-muted dark:text-gray-400 hover:bg-surface-hover dark:hover:bg-white/5'}`}>
+                        <button key={tab.id} onClick={() => { setActiveTab(tab.id); if (tab.id === 'leads') clearUnreadInquiries(); }} className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all ${activeTab === tab.id ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'text-text-muted dark:text-gray-400 hover:bg-surface-hover dark:hover:bg-white/5'}`}>
                             <tab.icon className="w-4 h-4" />{tab.label}
                         </button>
                     ))}

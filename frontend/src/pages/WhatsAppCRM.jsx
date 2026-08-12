@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, FileText, Megaphone, BarChart3, Search, Send, Tag, Phone, ArrowLeft, Users, Clock, ChevronRight, Copy } from 'lucide-react';
+import { MessageSquare, FileText, Megaphone, BarChart3, Search, Send, Tag, Phone, ArrowLeft, Users, Clock, ChevronRight, Copy, Bell, BellRing } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
+import useInquiryNotifications from '../hooks/useInquiryNotifications';
 
 const API = API_BASE_URL;
 
@@ -94,6 +95,13 @@ const WhatsAppCRM = () => {
     const [broadcastMessage, setBroadcastMessage] = useState('');
     const navigate = useNavigate();
     const token = localStorage.getItem('admin_token');
+    const {
+        browserNotificationPermission,
+        clearUnreadInquiries,
+        enableBrowserNotifications,
+        processLeadUpdate,
+        unreadInquiryCount,
+    } = useInquiryNotifications();
 
     const tabs = [
         { id: 'conversations', label: 'Conversations', icon: MessageSquare },
@@ -114,6 +122,7 @@ const WhatsAppCRM = () => {
             const res = await fetch(`${API}/api/leads`, { headers: { Authorization: `Bearer ${token}` } });
             if (res.ok) {
                 const data = await res.json();
+                processLeadUpdate(data);
                 setLeads(data.length > 0 ? data : INITIAL_LEADS);
             } else {
                 setLeads(INITIAL_LEADS);
@@ -122,7 +131,7 @@ const WhatsAppCRM = () => {
             console.error(e);
             setLeads(INITIAL_LEADS);
         }
-    }, [token]);
+    }, [token, processLeadUpdate]);
 
     const fetchProducts = useCallback(async () => {
         try {
@@ -134,6 +143,8 @@ const WhatsAppCRM = () => {
     useEffect(() => {
         fetchLeads();
         fetchProducts();
+        const leadPollingInterval = window.setInterval(fetchLeads, 30000);
+        return () => window.clearInterval(leadPollingInterval);
     }, [fetchLeads, fetchProducts]);
 
     const generatePriceList = () => {
@@ -172,6 +183,20 @@ const WhatsAppCRM = () => {
                         <h1 className="text-4xl md:text-5xl font-display font-black text-text-main uppercase tracking-tight">WhatsApp CRM</h1>
                         <p className="text-lg text-text-muted mt-2 font-bold">Manage buyer relationships & automated campaigns</p>
                     </div>
+                    <button
+                        type="button"
+                        onClick={enableBrowserNotifications}
+                        className="relative flex items-center gap-2 px-5 py-3 rounded-xl bg-primary/10 text-primary font-black text-xs uppercase tracking-widest border border-primary/20 hover:bg-primary/20 transition-all"
+                        title="Enable browser alerts for newly received inquiries"
+                    >
+                        {browserNotificationPermission === 'granted' ? <BellRing className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+                        {browserNotificationPermission === 'granted' ? 'Notifications On' : 'Enable Notifications'}
+                        {unreadInquiryCount > 0 && (
+                            <span className="min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
+                                {unreadInquiryCount}
+                            </span>
+                        )}
+                    </button>
                 </div>
 
                 {/* Stats */}
@@ -194,7 +219,7 @@ const WhatsAppCRM = () => {
                     {tabs.map((tab) => (
                         <button 
                             key={tab.id} 
-                            onClick={() => setActiveTab(tab.id)} 
+                            onClick={() => { setActiveTab(tab.id); if (tab.id === 'conversations') clearUnreadInquiries(); }}
                             className={`flex items-center gap-3 px-8 py-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
                                 activeTab === tab.id 
                                     ? 'bg-primary text-white shadow-xl shadow-primary/25' 
