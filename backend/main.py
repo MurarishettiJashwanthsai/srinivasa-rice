@@ -17,6 +17,7 @@ from sqlalchemy import text
 import cloudinary
 import cloudinary.uploader
 import httpx
+from passlib.hash import pbkdf2_sha256
 
 from database import engine, Base, get_db
 from models import RicePrice, Lead
@@ -33,6 +34,8 @@ if not SECRET_KEY:
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_HOURS = int(os.getenv("ACCESS_TOKEN_HOURS", "8"))
+FALLBACK_ADMIN_USERNAME = "srinivasulu@srinivascanvassing.com"
+FALLBACK_ADMIN_PASSWORD_HASH = "$pbkdf2-sha256$600000$snYOYex9j5FyztkbI2QMoQ$ppmWsnOGBMg1XsJWuiKqojNICNRwV2N5EZMEf6MF03Q"
 
 # Security scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/admin/login")
@@ -251,7 +254,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
-        expected_user = os.getenv("ADMIN_USERNAME", "").strip().lower()
+        configured_user = os.getenv("ADMIN_USERNAME", "").strip().lower()
+        configured_password = os.getenv("ADMIN_PASSWORD", "")
+        if bool(configured_user) != bool(configured_password):
+            raise credentials_exception
+        expected_user = configured_user or FALLBACK_ADMIN_USERNAME
         if not username or not isinstance(username, str) or username.lower() != expected_user:
             raise credentials_exception
         return username
@@ -306,13 +313,25 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     expected_user = os.getenv("ADMIN_USERNAME", "").strip().lower()
     expected_pass = os.getenv("ADMIN_PASSWORD", "")
 
-    if not expected_user or not expected_pass:
+    if bool(expected_user) != bool(expected_pass):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Administrative authentication is not configured",
+            detail="ADMIN_USERNAME and ADMIN_PASSWORD must be configured together",
         )
-    
-    if hmac.compare_digest(username, expected_user) and hmac.compare_digest(password, expected_pass):
+
+    if expected_user and expected_pass:
+        credentials_valid = (
+            hmac.compare_digest(username, expected_user)
+            and hmac.compare_digest(password, expected_pass)
+        )
+    else:
+        expected_user = FALLBACK_ADMIN_USERNAME
+        credentials_valid = (
+            hmac.compare_digest(username, expected_user)
+            and pbkdf2_sha256.verify(password, FALLBACK_ADMIN_PASSWORD_HASH)
+        )
+
+    if credentials_valid:
         now = datetime.datetime.now(datetime.timezone.utc)
         access_token = jwt.encode(
             {

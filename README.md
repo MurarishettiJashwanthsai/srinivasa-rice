@@ -46,6 +46,11 @@ invalid whenever the service restarts. Never commit real secret values. If a
 credential has previously appeared in source control, rotate it in the hosting
 provider before deploying this revision.
 
+When both admin environment variables are absent, the application can use the
+strong hashed emergency account bundled for recovery. Setting both Render
+variables automatically overrides and disables that recovery credential. If
+only one variable is configured, login fails closed with a configuration error.
+
 ### 2. Run the React Frontend
 The frontend uses Vite for ultra-fast development.
 
