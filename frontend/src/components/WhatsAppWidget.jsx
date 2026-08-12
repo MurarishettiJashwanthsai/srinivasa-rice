@@ -36,7 +36,7 @@ const WhatsAppWidget = () => {
                         <div className="bg-[#075E54] px-5 py-4 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                                    <img src="/logo.png" alt="Logo" className="w-8 h-8 rounded-full object-cover" />
+                                    <img src="/logo-256.png" alt="Sri Srinivasa Canvassing" width="32" height="32" className="w-8 h-8 rounded-full object-cover" loading="lazy" decoding="async" />
                                 </div>
                                 <div>
                                     <h4 className="text-white font-bold text-sm">Sri Srinivasa Canvassing</h4>

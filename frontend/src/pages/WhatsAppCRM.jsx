@@ -24,6 +24,7 @@ const INITIAL_LEADS = [
         inquiry_text: "Interested in 50 MT Sona Masuri Steam rice export quality. Please share latest FOB price quote.",
         status: "contacted",
         source_page: "contact",
+        notification_status: "not_configured",
         created_at: new Date(Date.now() - 3600000 * 5).toISOString()
     },
     {
@@ -42,6 +43,7 @@ const INITIAL_LEADS = [
         inquiry_text: "Looking for regular supply of 1121 Basmati Sella 50kg PP bags to Jebel Ali. Need CIF Dubai rate.",
         status: "in_progress",
         source_page: "contact",
+        notification_status: "not_configured",
         created_at: new Date(Date.now() - 3600000 * 24).toISOString()
     },
     {
@@ -60,6 +62,7 @@ const INITIAL_LEADS = [
         inquiry_text: "Require 200 MT IR64 5% Broken Non-Basmati Rice for immediate shipment. Please send specifications.",
         status: "new",
         source_page: "contact",
+        notification_status: "not_configured",
         created_at: new Date(Date.now() - 3600000 * 48).toISOString()
     },
     {
@@ -78,6 +81,7 @@ const INITIAL_LEADS = [
         inquiry_text: "Requesting price quote and moisture report for Sona Masuri Raw 25kg non-woven bag packaging.",
         status: "new",
         source_page: "contact",
+        notification_status: "not_configured",
         created_at: new Date(Date.now() - 3600000 * 72).toISOString()
     }
 ];
@@ -152,6 +156,7 @@ const WhatsAppCRM = () => {
             { label: 'Total Contacts', value: leads.length, icon: Users, color: 'text-primary' },
             { label: 'This Month', value: leads.filter(l => new Date(l.created_at) > monthAgoTimestamp).length, icon: Clock, color: 'text-emerald-500' },
             { label: 'Subscribers', value: leads.filter(l => l.inquiry_text?.includes('Price Alert')).length, icon: Tag, color: 'text-primary' },
+            { label: 'Notifications Sent', value: leads.filter(l => l.notification_status === 'delivered').length, icon: Send, color: 'text-emerald-500' },
         ];
     }, [leads]);
 
@@ -170,7 +175,7 @@ const WhatsAppCRM = () => {
                 </div>
 
                 {/* Stats */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-12">
                     {stats.map((s) => (
                         <div key={s.label} className="premium-card !p-8 flex items-center gap-6">
                             <div className={`w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center ${s.color}`}>
@@ -232,6 +237,7 @@ const WhatsAppCRM = () => {
                                                     <th className="py-6 px-8">Organization</th>
                                                     <th className="py-6 px-8">Direct Access</th>
                                                     <th className="py-6 px-8">Interaction Date</th>
+                                                    <th className="py-6 px-8">Notification</th>
                                                     <th className="py-6 px-8 text-center">Protocol</th>
                                                 </tr>
                                             </thead>
@@ -251,6 +257,17 @@ const WhatsAppCRM = () => {
                                                             </a>
                                                         </td>
                                                         <td className="py-6 px-8 text-sm text-text-muted font-bold whitespace-nowrap">{new Date(lead.created_at).toLocaleDateString()}</td>
+                                                        <td className="py-6 px-8">
+                                                            <span className={`inline-flex rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-wider ${
+                                                                lead.notification_status === 'delivered'
+                                                                    ? 'bg-emerald-500/10 text-emerald-500'
+                                                                    : lead.notification_status === 'failed'
+                                                                        ? 'bg-red-500/10 text-red-500'
+                                                                        : 'bg-primary/10 text-primary'
+                                                            }`}>
+                                                                {lead.notification_status || 'legacy'}
+                                                            </span>
+                                                        </td>
                                                         <td className="py-6 px-8 text-center">
                                                             <a href={`https://wa.me/${lead.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20">
                                                                 <Send className="w-3.5 h-3.5" /> Message

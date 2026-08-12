@@ -55,7 +55,7 @@ const Navbar = () => {
                         <div className="flex items-center -ml-2 lg:-ml-6">
                             <Link to="/" className="flex items-center gap-3 group min-h-[44px] min-w-[44px]">
                                 <img
-                                    src="/logo.png"
+                                    src="/logo-256.png"
                                     alt="Sri Srinivasa Canvassing Logo"
                                     width="56"
                                     height="56"

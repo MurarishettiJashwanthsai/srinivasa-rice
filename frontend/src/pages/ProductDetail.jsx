@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ShieldCheck, MapPin, Package, Truck, Calendar, DollarSign, FileText, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { OptimizedImage } from '../components/OptimizedImage';
@@ -20,15 +20,14 @@ const SEEDED_VARIETIES_CATALOG = {
 const slugify = (text) => {
     return text.toString().toLowerCase()
         .replace(/\s+/g, '-')
-        .replace(/[^\w\-]+/g, '')
-        .replace(/\-\-+/g, '-')
+        .replace(/[^\w-]+/g, '')
+        .replace(/--+/g, '-')
         .replace(/^-+/, '')
         .replace(/-+$/, '');
 };
 
 const ProductDetail = () => {
     const { slug } = useParams();
-    const navigate = useNavigate();
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);

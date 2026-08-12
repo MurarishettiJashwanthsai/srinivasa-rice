@@ -77,7 +77,8 @@ const Contact = () => {
                 packaging_type: formData.packaging_type,
                 incoterm: formData.incoterm,
                 inquiry: `${formData.inquiry}${formData.subscribe_alerts ? ' | Opted in for Daily Price Alerts' : ''}`,
-                honeypot: formData.honeypot
+                honeypot: formData.honeypot,
+                source_page: 'contact'
             };
 
             const response = await fetch(`${API_BASE_URL}/api/contact`, {
@@ -88,15 +89,32 @@ const Contact = () => {
 
             if (response.ok) {
                 const data = await response.json();
-                setRfqId(data.request_id || 'RFQ-2026-CONFIRMED');
+                if (!data.request_id) {
+                    throw new Error('The server did not return a quote reference.');
+                }
+                setRfqId(data.request_id);
                 setStatus('success');
+                window.dataLayer = window.dataLayer || [];
+                window.dataLayer.push({
+                    event: 'quote_form_success',
+                    request_id: data.request_id,
+                    notification_status: data.notification_status || 'unknown',
+                    source_page: 'contact'
+                });
+                window.dispatchEvent(new CustomEvent('lead:submitted', {
+                    detail: {
+                        requestId: data.request_id,
+                        notificationStatus: data.notification_status || 'unknown',
+                        sourcePage: 'contact'
+                    }
+                }));
             } else {
                 const errData = await response.json();
                 setErrorMessage(errData.detail || 'Failed to submit quote request. Please try again.');
                 setStatus('error');
             }
-        } catch {
-            setErrorMessage('Network connection error. Please try again later.');
+        } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : 'Network connection error. Please try again later.');
             setStatus('error');
         }
     };
@@ -178,7 +196,12 @@ const Contact = () => {
                                     </button>
                                 </div>
                             ) : (
-                                <form onSubmit={handleSubmit} className="space-y-6">
+                                <form
+                                    onSubmit={handleSubmit}
+                                    method="post"
+                                    action={`${API_BASE_URL}/api/contact`}
+                                    className="space-y-6"
+                                >
                                     {/* Honeypot Spam Trap */}
                                     <input
                                         type="text"
@@ -211,8 +234,11 @@ const Contact = () => {
                                             <div className="flex gap-2">
                                                 <div className="relative shrink-0">
                                                     <select
+                                                        id="country_code"
+                                                        name="country_code"
                                                         value={countryCode}
                                                         onChange={(e) => setCountryCode(e.target.value)}
+                                                        autoComplete="tel-country-code"
                                                         className="appearance-none w-24 h-full pl-4 pr-8 py-3.5 rounded-xl border-2 border-border/20 bg-black/20 text-text-main dark:text-white font-black text-sm cursor-pointer"
                                                         aria-label="Country Code"
                                                     >

@@ -50,7 +50,7 @@ const Packaging = () => {
                             <Ship className="h-8 w-8 text-primary" /> Port Connectivity
                         </h2>
                         <GlassCard variant="premium" hover={false} animate={false} className="space-y-6 text-text-muted dark:text-gray-300">
-                            <img src="/packaging-image.png" alt="Packaging and Logistics" className="w-full h-56 object-cover object-center rounded-xl shadow-sm" loading="lazy" />
+                            <img src="/packaging-image-1000.jpg" alt="Packaging and Logistics" width="562" height="1000" className="w-full h-56 object-cover object-center rounded-xl shadow-sm" loading="lazy" decoding="async" />
                             <p className="leading-relaxed">Miryalaguda's strategic location in Telangana provides excellent rail and road connectivity to major eastern coastal ports.</p>
                             <div className="space-y-3">
                                 {[

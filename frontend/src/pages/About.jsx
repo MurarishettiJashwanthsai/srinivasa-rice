@@ -30,10 +30,13 @@ const About = () => {
                     <motion.div {...fadeUp} className="flex flex-col gap-6 w-full">
                         <div className="relative group overflow-hidden rounded-2xl shadow-2xl">
                             <img 
-                                src="/about-mill.png" 
+                                src="/about-mill-1200.jpg"
                                 alt="Advanced Rice Milling Facility" 
+                                width="1200"
+                                height="1200"
                                 className="w-full h-auto transition-transform duration-700 group-hover:scale-110" 
                                 loading="lazy" 
+                                decoding="async"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                             <p className="absolute bottom-4 left-4 text-white font-bold">Industrial Milling Infrastructure</p>
@@ -57,10 +60,13 @@ const About = () => {
                     <motion.div {...fadeUp} className="order-1 md:order-2 flex flex-col gap-6 w-full">
                         <div className="relative group overflow-hidden rounded-2xl shadow-2xl">
                             <img 
-                                src="/about-canvassing.png" 
+                                src="/about-canvassing-1200.jpg"
                                 alt="Rice Canvassing and Quality Inspection" 
+                                width="1200"
+                                height="1200"
                                 className="w-full h-auto transition-transform duration-700 group-hover:scale-110" 
                                 loading="lazy" 
+                                decoding="async"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                             <p className="absolute bottom-4 left-4 text-white font-bold">Expert Canvassing & Inspection</p>

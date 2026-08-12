@@ -32,6 +32,10 @@ uvicorn main:app --reload
 The FastAPI backend will start running at `http://localhost:8000`. 
 *Note: A SQLite database (`market_data.db`) will be automatically created and seeded with initial pricing data upon the first startup.*
 
+To notify an external CRM or automation service when a lead is saved, set
+`LEAD_NOTIFICATION_WEBHOOK_URL` in `backend/.env`. If it is left empty, the
+lead is still saved and its notification status is recorded as `not_configured`.
+
 ### 2. Run the React Frontend
 The frontend uses Vite for ultra-fast development.
 

@@ -4,6 +4,7 @@ import { ArrowRight, Globe2, ShieldCheck, Box, MessageCircle, Send, TrendingUp, 
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import GlassCard from '../components/GlassCard';
+import OptimizedImage from '../components/OptimizedImage';
 import { countries } from '../data/countries';
 import { API_BASE_URL } from '../config/api';
 
@@ -12,6 +13,7 @@ const Home = () => {
     const [whatsapp, setWhatsapp] = useState('');
     const [countryCode, setCountryCode] = useState('+91');
     const [loading, setLoading] = useState(false);
+    const [subscriptionReference, setSubscriptionReference] = useState('');
     const [products, setProducts] = useState([]);
 
     useEffect(() => {
@@ -36,11 +38,32 @@ const Home = () => {
                     name, 
                     company: "Price Alert Subscriber", 
                     whatsapp: fullNumber, 
-                    inquiry: `🚨 AUTOMATED LEAD: Subscribed to Daily WhatsApp Price Alerts (Country: ${countryCode})` 
+                    inquiry: `Subscribed to Daily WhatsApp Price Alerts (Country: ${countryCode})`,
+                    source_page: 'price-alert'
                 })
             });
-            if (response.ok) { toast.success('Successfully subscribed to morning price alerts!'); setName(''); setWhatsapp(''); }
-            else toast.error('Failed to subscribe. Please try again.');
+            if (response.ok) {
+                const data = await response.json();
+                if (!data.request_id) throw new Error('Missing subscription reference');
+                setSubscriptionReference(data.request_id);
+                toast.success(`Subscribed successfully. Reference: ${data.request_id}`);
+                window.dataLayer = window.dataLayer || [];
+                window.dataLayer.push({
+                    event: 'price_alert_form_success',
+                    request_id: data.request_id,
+                    notification_status: data.notification_status || 'unknown',
+                    source_page: 'price-alert'
+                });
+                window.dispatchEvent(new CustomEvent('lead:submitted', {
+                    detail: {
+                        requestId: data.request_id,
+                        notificationStatus: data.notification_status || 'unknown',
+                        sourcePage: 'price-alert'
+                    }
+                }));
+                setName('');
+                setWhatsapp('');
+            } else toast.error('Failed to subscribe. Please try again.');
         } catch { toast.error('Network error. Please try again later.'); }
         finally { setLoading(false); }
     };
@@ -68,8 +91,12 @@ const Home = () => {
                 {/* ═══ BACKGROUND ═══ */}
                 <div className="absolute inset-0 z-0">
                     <img 
-                        src="https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80" 
+                        src="https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=75&w=1920"
                         alt="Miryalaguda Rice Grains Processing" 
+                        width="1920"
+                        height="1280"
+                        fetchPriority="high"
+                        decoding="async"
                         className="w-full h-full object-cover opacity-30 dark:opacity-40 grayscale-[0.5] dark:grayscale-0"
                     />
                     <div className="absolute inset-0 bg-background/40 dark:bg-black/60" />
@@ -174,6 +201,11 @@ const Home = () => {
                                 {loading ? '...' : <><span>Get Alerts</span><Send className="w-4 h-4" /></>}
                             </button>
                         </form>
+                        {subscriptionReference && (
+                            <p className="mt-4 text-sm font-bold text-primary" role="status" aria-live="polite">
+                                Subscription reference: <span className="font-mono">{subscriptionReference}</span>
+                            </p>
+                        )}
                     </div>
                 </motion.div>
             </section>
@@ -192,11 +224,13 @@ const Home = () => {
                             return (
                                 <div key={product.id} className="premium-card group overflow-hidden flex flex-col">
                                     <div className="h-56 overflow-hidden relative">
-                                        <img 
+                                        <OptimizedImage
                                             src={product.image_url ? (product.image_url.startsWith('http') ? product.image_url : `${API_BASE_URL}/${product.image_url}`) : defaultImages[i % defaultImages.length]} 
                                             alt={product.variety_name} 
                                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                                            loading="lazy" 
+                                            width={800}
+                                            height={600}
+                                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                                         />
                                         <div className="absolute bottom-4 left-4 px-4 py-2 rounded-xl bg-background/90 backdrop-blur-md text-primary text-sm font-black shadow-xl">
                                             ₹{product.current_price_mt}/MT

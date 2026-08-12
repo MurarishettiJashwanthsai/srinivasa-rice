@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import Integer, String, Float
+from sqlalchemy import Integer, String, Float, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from database import Base
 
@@ -61,6 +61,10 @@ class Lead(Base):
     inquiry_text: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[Optional[str]] = mapped_column(String, default="new", nullable=True)
     source_page: Mapped[Optional[str]] = mapped_column(String, default="contact", nullable=True)
+    notification_status: Mapped[Optional[str]] = mapped_column(String, default="pending", nullable=True)
+    notification_channel: Mapped[Optional[str]] = mapped_column(String, default="webhook", nullable=True)
+    notification_attempted_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    notification_delivered_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    notification_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-
 

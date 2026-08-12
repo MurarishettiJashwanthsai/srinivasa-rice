@@ -31,6 +31,11 @@ def run_migration():
         ("leads", "incoterm", "VARCHAR"),
         ("leads", "status", "VARCHAR DEFAULT 'new'"),
         ("leads", "source_page", "VARCHAR DEFAULT 'contact'"),
+        ("leads", "notification_status", "VARCHAR DEFAULT 'legacy'"),
+        ("leads", "notification_channel", "VARCHAR DEFAULT 'none'"),
+        ("leads", "notification_attempted_at", "VARCHAR"),
+        ("leads", "notification_delivered_at", "VARCHAR"),
+        ("leads", "notification_error", "TEXT"),
         ("leads", "created_at", "VARCHAR"),
     ]
 
@@ -49,5 +54,3 @@ def run_migration():
 
 if __name__ == "__main__":
     run_migration()
-
-

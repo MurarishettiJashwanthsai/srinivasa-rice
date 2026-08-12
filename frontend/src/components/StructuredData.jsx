@@ -7,9 +7,26 @@ export const StructuredData = ({ products = [] }) => {
     const location = useLocation();
 
     useEffect(() => {
+        let robotsMeta = document.querySelector('meta[name="robots"]');
+        if (!robotsMeta) {
+            robotsMeta = document.createElement('meta');
+            robotsMeta.setAttribute('name', 'robots');
+            document.head.appendChild(robotsMeta);
+        }
+
+        const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
+        robotsMeta.setAttribute(
+            'content',
+            isAdminRoute ? 'noindex, nofollow, noarchive' : 'index, follow'
+        );
+
         const existingScript = document.getElementById('ss-dynamic-structured-data');
         if (existingScript) {
             existingScript.remove();
+        }
+
+        if (isAdminRoute) {
+            return undefined;
         }
 
         const script = document.createElement('script');
@@ -118,8 +135,7 @@ export const StructuredData = ({ products = [] }) => {
                                 'itemCondition': 'https://schema.org/NewCondition',
                                 'availability': 'https://schema.org/InStock',
                                 'seller': {
-                                    '@type': 'Organization',
-                                    'name': 'Sri Srinivasa Canvassing',
+                                    '@id': `${DOMAIN}/#organization`,
                                 },
                                 'priceSpecification': {
                                     '@type': 'UnitPriceSpecification',

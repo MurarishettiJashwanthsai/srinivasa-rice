@@ -26,8 +26,8 @@ const AdminLogin = () => {
             formData.append('username', username);
             formData.append('password', password);
             const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData.toString()
             });
             if (response.ok) {
@@ -38,10 +38,10 @@ const AdminLogin = () => {
             } else {
                 toast.error('Invalid username or password credentials');
             }
-        } catch { 
-            toast.error('Unable to connect to administrative server'); 
-        } finally { 
-            setLoading(false); 
+        } catch {
+            toast.error('Unable to connect to administrative server');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -62,35 +62,35 @@ const AdminLogin = () => {
                     <form className="space-y-6" onSubmit={handleLogin} method="POST">
                         <div>
                             <label htmlFor="admin-username" className="block text-xs font-black text-text-main dark:text-white/80 uppercase tracking-widest mb-2">Username or Email</label>
-                            <input 
+                            <input
                                 id="admin-username"
                                 name="username"
-                                type="text" 
+                                type="text"
                                 autoComplete="username"
-                                required 
-                                value={username} 
-                                onChange={(e) => setUsername(e.target.value)} 
-                                className={inputClass} 
-                                placeholder="srinivasulu@srinivascanvassing.com" 
+                                required
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                className={inputClass}
+                                placeholder="Username or Email id"
                             />
                         </div>
                         <div>
                             <label htmlFor="admin-password" className="block text-xs font-black text-text-main dark:text-white/80 uppercase tracking-widest mb-2">Password</label>
-                            <input 
+                            <input
                                 id="admin-password"
                                 name="password"
-                                type="password" 
+                                type="password"
                                 autoComplete="current-password"
-                                required 
-                                value={password} 
-                                onChange={(e) => setPassword(e.target.value)} 
-                                className={inputClass} 
-                                placeholder="••••••••" 
+                                required
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className={inputClass}
+                                placeholder="••••••••"
                             />
                         </div>
-                        <button 
-                            type="submit" 
-                            disabled={loading} 
+                        <button
+                            type="submit"
+                            disabled={loading}
                             className={`w-full flex justify-center py-4 rounded-xl font-black uppercase tracking-widest text-sm text-white bg-primary hover:bg-primary-dark transition-all hover:scale-[1.02] shadow-lg shadow-primary/20 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
                             {loading ? 'Authenticating...' : 'Sign in to Terminal'}

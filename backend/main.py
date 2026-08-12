@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
 import cloudinary
 import cloudinary.uploader
+import httpx
 
 from database import engine, Base, get_db
 from models import RicePrice, Lead
@@ -61,16 +62,10 @@ def init_db():
         ]
         
         current_time = datetime.datetime.now().isoformat()
-        target_names = {item[0] for item in seed_data}
         existing_products = {p.variety_name: p for p in db.query(RicePrice).all()}
         
         db_changed = False
-        # Remove any products not in target list
-        for name, prod in existing_products.items():
-            if name not in target_names and not name.startswith("Sona Masuri Steam(BPT)") and not name.startswith("Sona Masuri Raw(BPT)"):
-                db.delete(prod)
-                db_changed = True
-
+        # Preserve all existing products; seed data only adds missing rows or refreshes matching rows.
         for item in seed_data:
             name, curr_price, prev_price, change, trend = item
             if name in existing_products:
@@ -261,6 +256,7 @@ class ContactForm(BaseModel):
     packaging_type: Optional[str] = None
     incoterm: Optional[str] = None
     honeypot: Optional[str] = None # Anti-spam trap field
+    source_page: Optional[str] = "contact"
 
 class ProductAdd(BaseModel):
     name: str
@@ -553,10 +549,16 @@ async def handle_contact(form_data: ContactForm, db: Session = Depends(get_db)):
     # Anti-spam Honeypot Check
     if form_data.honeypot and len(form_data.honeypot.strip()) > 0:
         # Silent rejection for bot submissions
-        return {"message": "Inquiry received successfully.", "request_id": "RFQ-BOT-FILTERED"}
+        return {
+            "message": "Inquiry received successfully.",
+            "request_id": "RFQ-BOT-FILTERED",
+            "notification_status": "filtered"
+        }
 
-    request_id = f"RFQ-2026-{secrets.token_hex(3).upper()}"
+    request_id = f"RFQ-{datetime.datetime.now().year}-{secrets.token_hex(3).upper()}"
     try:
+        allowed_sources = {"contact", "price-alert"}
+        source_page = form_data.source_page if form_data.source_page in allowed_sources else "contact"
         new_lead = Lead(
             request_id=request_id,
             name=form_data.name.strip(),
@@ -571,14 +573,50 @@ async def handle_contact(form_data: ContactForm, db: Session = Depends(get_db)):
             incoterm=form_data.incoterm,
             inquiry_text=form_data.inquiry.strip(),
             status="new",
-            source_page="contact",
+            source_page=source_page,
+            notification_status="pending",
+            notification_channel="webhook",
             created_at=datetime.datetime.now().isoformat()
         )
         db.add(new_lead)
         db.commit()
+
+        webhook_url = os.getenv("LEAD_NOTIFICATION_WEBHOOK_URL", "").strip()
+        if not webhook_url:
+            new_lead.notification_status = "not_configured"
+            new_lead.notification_channel = "none"
+        else:
+            new_lead.notification_attempted_at = datetime.datetime.now().isoformat()
+            try:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    notification_response = await client.post(
+                        webhook_url,
+                        json={
+                            "event": "new_lead",
+                            "request_id": request_id,
+                            "source_page": source_page,
+                            "name": new_lead.name,
+                            "company": new_lead.company,
+                            "email": new_lead.email,
+                            "whatsapp": new_lead.whatsapp,
+                            "product_name": new_lead.product_name,
+                            "quantity_mt": new_lead.quantity_mt,
+                            "created_at": new_lead.created_at,
+                        },
+                    )
+                    notification_response.raise_for_status()
+                new_lead.notification_status = "delivered"
+                new_lead.notification_delivered_at = datetime.datetime.now().isoformat()
+                new_lead.notification_error = None
+            except Exception as notification_error:
+                new_lead.notification_status = "failed"
+                new_lead.notification_error = str(notification_error)[:500]
+
+        db.commit()
         return {
             "message": "Inquiry received successfully. Our team will contact you shortly via WhatsApp.",
-            "request_id": request_id
+            "request_id": request_id,
+            "notification_status": new_lead.notification_status
         }
     except Exception as e:
         db.rollback()
@@ -609,4 +647,3 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
-

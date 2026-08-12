@@ -55,6 +55,15 @@ def test_rfq_contact_submission():
     data = response.json()
     assert "request_id" in data
     assert data["request_id"].startswith("RFQ-2026-")
+    assert data["notification_status"] in {"not_configured", "delivered", "failed"}
+
+    db = SessionLocal()
+    try:
+        saved_lead = db.query(Lead).filter(Lead.request_id == data["request_id"]).one()
+        assert saved_lead.notification_status == data["notification_status"]
+        assert saved_lead.source_page == "contact"
+    finally:
+        db.close()
 
 def test_rfq_honeypot_bot_filtering():
     payload = {
@@ -138,4 +147,3 @@ def test_unusual_rate_warning():
     }
     confirm_resp = client.put(f"/api/products/update/{prod_id}", json=confirm_payload, headers=headers)
     assert confirm_resp.status_code == 200
-
