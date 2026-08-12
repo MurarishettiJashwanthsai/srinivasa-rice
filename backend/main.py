@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import hmac
 import os
 import secrets
@@ -17,7 +18,6 @@ from sqlalchemy import text
 import cloudinary
 import cloudinary.uploader
 import httpx
-from passlib.hash import pbkdf2_sha256
 
 from database import engine, Base, get_db
 from models import RicePrice, Lead
@@ -35,7 +35,19 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_HOURS = int(os.getenv("ACCESS_TOKEN_HOURS", "8"))
 FALLBACK_ADMIN_USERNAME = "srinivasulu@srinivascanvassing.com"
-FALLBACK_ADMIN_PASSWORD_HASH = "$pbkdf2-sha256$600000$snYOYex9j5FyztkbI2QMoQ$ppmWsnOGBMg1XsJWuiKqojNICNRwV2N5EZMEf6MF03Q"
+FALLBACK_ADMIN_PASSWORD_ROUNDS = 600_000
+FALLBACK_ADMIN_PASSWORD_SALT = bytes.fromhex("a77d2bd53023413dd1d61798a5424fc4")
+FALLBACK_ADMIN_PASSWORD_HASH = "3fb2987c38db69e9de26ef4311361ef98cc4ff110f67d32d8e902c7c490446c3"
+
+
+def verify_fallback_admin_password(password: str) -> bool:
+    candidate_hash = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        FALLBACK_ADMIN_PASSWORD_SALT,
+        FALLBACK_ADMIN_PASSWORD_ROUNDS,
+    ).hex()
+    return hmac.compare_digest(candidate_hash, FALLBACK_ADMIN_PASSWORD_HASH)
 
 # Security scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/admin/login")
@@ -328,7 +340,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         expected_user = FALLBACK_ADMIN_USERNAME
         credentials_valid = (
             hmac.compare_digest(username, expected_user)
-            and pbkdf2_sha256.verify(password, FALLBACK_ADMIN_PASSWORD_HASH)
+            and verify_fallback_admin_password(password)
         )
 
     if credentials_valid:
