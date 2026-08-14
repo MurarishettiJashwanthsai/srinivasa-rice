@@ -5,17 +5,12 @@ import { ArrowRight, FileText } from 'lucide-react';
 import GlassCard from '../components/GlassCard';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import { OptimizedImage } from '../components/OptimizedImage';
-import useMeta from '../hooks/useMeta';
 import { API_BASE_URL } from '../config/api';
+import { PRODUCT_CATALOG } from '../data/productCatalog';
 
 const Products = () => {
-    useMeta({
-        title: 'Bulk Rice Varieties — Sona Masuri, RNR and JSR',
-        description: 'Browse currently listed Sona Masuri, RNR and JSR rice varieties sourced through selected Miryalaguda milling facilities.',
-    });
-
-    const [products, setProducts] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [products, setProducts] = useState(PRODUCT_CATALOG);
+    const [loading, setLoading] = useState(false);
     const [fetchFailed, setFetchFailed] = useState(false);
 
     useEffect(() => {
@@ -31,8 +26,8 @@ const Products = () => {
             } catch (error) { 
                 console.error('Failed to fetch products', error); 
                 setFetchFailed(true);
-            } finally { 
-                setLoading(false); 
+            } finally {
+                setLoading(false);
             }
         };
         fetchProducts();

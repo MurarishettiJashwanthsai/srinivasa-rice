@@ -1,10 +1,18 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { lazy, Suspense, useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import Navbar from './components/Navbar';
 import AdminHeader from './components/AdminHeader';
 import Footer from './components/Footer';
 import LiveTicker from './components/LiveTicker';
 import Home from './pages/Home';
+import About from './pages/About';
+import Products from './pages/Products';
+import ProductDetail from './pages/ProductDetail';
+import Packaging from './pages/Packaging';
+import Certifications from './pages/Certifications';
+import Contact from './pages/Contact';
+import Legal from './pages/Legal';
+import MarketDashboard from './pages/MarketDashboard';
 import MobileNav from './components/MobileNav';
 
 import { Toaster } from 'react-hot-toast';
@@ -14,17 +22,8 @@ import ScrollToTop from './components/ScrollToTop';
 import SkipLink from './components/SkipLink';
 import StructuredData from './components/StructuredData';
 import ErrorBoundary from './components/ErrorBoundary';
-import { API_BASE_URL } from './config/api';
 
-// Lazy loaded pages for code splitting
-const About = lazy(() => import('./pages/About'));
-const Products = lazy(() => import('./pages/Products'));
-const ProductDetail = lazy(() => import('./pages/ProductDetail'));
-const Packaging = lazy(() => import('./pages/Packaging'));
-const Certifications = lazy(() => import('./pages/Certifications'));
-const Contact = lazy(() => import('./pages/Contact'));
-const Legal = lazy(() => import('./pages/Legal'));
-const MarketDashboard = lazy(() => import('./pages/MarketDashboard'));
+// Admin-only pages remain code split; public pages are synchronously renderable at build time.
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const WhatsAppCRM = lazy(() => import('./pages/WhatsAppCRM'));
@@ -52,21 +51,12 @@ const AdminPage = ({ children }) => (
     </div>
 );
 
-function App() {
-    const [products, setProducts] = useState([]);
-
-    useEffect(() => {
-        fetch(`${API_BASE_URL}/api/products`)
-            .then((res) => (res.ok ? res.json() : []))
-            .then((data) => setProducts(data))
-            .catch(() => {});
-    }, []);
-
+export function AppContent() {
     return (
-        <Router>
+        <>
             <SkipLink />
             <ScrollToTop />
-            <StructuredData products={products} />
+            <StructuredData />
             <Toaster
                 position="top-right"
                 toastOptions={{
@@ -121,7 +111,15 @@ function App() {
                     </div>
                 } />
             </Routes>
-        </Router>
+        </>
+    );
+}
+
+function App() {
+    return (
+        <BrowserRouter>
+            <AppContent />
+        </BrowserRouter>
     );
 }
 

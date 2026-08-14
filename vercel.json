@@ -1,5 +1,12 @@
 {
   "version": 2,
+  "redirects": [
+    {
+      "source": "/products/jsr-steem-rice",
+      "destination": "/products/jsr-steam-rice",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/admin/:path*",
@@ -13,7 +20,11 @@
   ],
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/admin/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/card/:path*",
       "destination": "/index.html"
     }
   ]

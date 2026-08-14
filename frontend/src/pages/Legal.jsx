@@ -1,14 +1,8 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import useMeta from '../hooks/useMeta';
 
 const Legal = () => {
     const { hash } = useLocation();
-
-    useMeta({
-        title: 'Privacy, Terms and Commodity Disclaimer',
-        description: 'Read the privacy policy, website terms and commodity-price disclaimer for Sri Srinivasa Canvassing. Information on data handling, retention, and indicative rates.',
-    });
 
     useEffect(() => {
         if (hash) {
@@ -108,4 +102,3 @@ const Legal = () => {
 };
 
 export default Legal;
-

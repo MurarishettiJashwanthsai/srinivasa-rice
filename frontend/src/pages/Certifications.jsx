@@ -1,14 +1,8 @@
-import { Award, ShieldCheck, CheckCircle, Building2, Factory, FileCheck } from 'lucide-react';
+import { ShieldCheck, CheckCircle, Building2, Factory, FileCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import GlassCard from '../components/GlassCard';
-import useMeta from '../hooks/useMeta';
 
 const Certifications = () => {
-    useMeta({
-        title: 'Export Credentials & Mill Quality Standards',
-        description: 'View Sri Srinivasa Canvassing IEC and GST registration information alongside stated partner milling facility quality standards.',
-    });
-
     const fadeUp = { initial: { opacity: 0, y: 30 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { duration: 0.6 } };
 
     const companyCredentials = [

@@ -3,15 +3,9 @@ import { TrendingUp, TrendingDown, Minus, Clock, Download, RefreshCw, AlertCircl
 import { motion } from 'framer-motion';
 import GlassCard from '../components/GlassCard';
 import { SkeletonTableRow, SkeletonStat } from '../components/SkeletonLoader';
-import useMeta from '../hooks/useMeta';
 import { API_BASE_URL } from '../config/api';
 
 const MarketDashboard = () => {
-    useMeta({
-        title: 'Miryalaguda Rice Market Rates — Indicative Wholesale Estimates',
-        description: 'View dated indicative wholesale rice rates from Miryalaguda. Final prices depend on grade, quantity, packaging and delivery terms.',
-    });
-
     const [prices, setPrices] = useState([]);
     const [lastFetchTime, setLastFetchTime] = useState(null);
     const [loading, setLoading] = useState(true);

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Globe2, ShieldCheck, Box, MessageCircle, Send, TrendingUp, Award, Truck, Users, Wheat, ChevronRight } from 'lucide-react';
+import { ArrowRight, Globe2, ShieldCheck, Box, MessageCircle, Send, TrendingUp, Truck, Users, Wheat, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import GlassCard from '../components/GlassCard';
 import OptimizedImage from '../components/OptimizedImage';
 import { countries } from '../data/countries';
 import { API_BASE_URL } from '../config/api';
+import { PRODUCT_CATALOG } from '../data/productCatalog';
 
 const Home = () => {
     const [name, setName] = useState('');
@@ -14,7 +15,7 @@ const Home = () => {
     const [countryCode, setCountryCode] = useState('+91');
     const [loading, setLoading] = useState(false);
     const [subscriptionReference, setSubscriptionReference] = useState('');
-    const [products, setProducts] = useState([]);
+    const [products, setProducts] = useState(PRODUCT_CATALOG);
 
     useEffect(() => {
         const fetchProducts = async () => {

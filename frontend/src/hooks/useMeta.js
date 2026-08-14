@@ -1,8 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-
-const DEFAULT_DOMAIN = 'https://www.srinivascanvassing.com';
-const DEFAULT_IMAGE = `${DEFAULT_DOMAIN}/logo.png`;
+import { DEFAULT_SOCIAL_IMAGE, SITE_NAME, getRouteMetadata } from '../seo/siteSeo';
 
 const setMetaTag = (selector, attrName, attrValue, content) => {
     let element = document.querySelector(selector);
@@ -25,39 +23,47 @@ const setLinkTag = (rel, href) => {
 };
 
 export const useMeta = ({
-    title = 'Rice Sourcing and Export from Miryalaguda',
-    description = 'Rice sourcing, canvassing and export support from Miryalaguda, Telangana. View available products, packaging, credentials and bulk enquiry information.',
-    ogType = 'website',
-    ogImage = DEFAULT_IMAGE,
+    title,
+    description,
+    canonical,
+    robots,
+    ogType,
+    ogImage,
 } = {}) => {
     const location = useLocation();
 
     useEffect(() => {
-        const fullTitle = title.includes('Sri Srinivasa Canvassing')
-            ? title
-            : `${title} — Sri Srinivasa Canvassing`;
+        const routeMetadata = getRouteMetadata(location.pathname);
+        const requestedTitle = title || routeMetadata.title;
+        const fullTitle = requestedTitle.includes(SITE_NAME)
+            ? requestedTitle
+            : `${requestedTitle} — ${SITE_NAME}`;
+        const finalDescription = description || routeMetadata.description;
+        const finalCanonical = canonical || routeMetadata.canonical;
+        const finalRobots = robots || routeMetadata.robots;
+        const finalOgType = ogType || routeMetadata.ogType;
+        const finalOgImage = ogImage || routeMetadata.ogImage || DEFAULT_SOCIAL_IMAGE;
         document.title = fullTitle;
 
-        const currentUrl = `${DEFAULT_DOMAIN}${location.pathname}${location.search}`;
-
         // Standard Meta
-        setMetaTag('meta[name="description"]', 'name', 'description', description);
-        setLinkTag('canonical', currentUrl);
+        setMetaTag('meta[name="description"]', 'name', 'description', finalDescription);
+        setMetaTag('meta[name="robots"]', 'name', 'robots', finalRobots);
+        setLinkTag('canonical', finalCanonical);
 
         // Open Graph Meta
-        setMetaTag('meta[property="og:type"]', 'property', 'og:type', ogType);
-        setMetaTag('meta[property="og:url"]', 'property', 'og:url', currentUrl);
+        setMetaTag('meta[property="og:type"]', 'property', 'og:type', finalOgType);
+        setMetaTag('meta[property="og:url"]', 'property', 'og:url', finalCanonical);
         setMetaTag('meta[property="og:title"]', 'property', 'og:title', fullTitle);
-        setMetaTag('meta[property="og:description"]', 'property', 'og:description', description);
-        setMetaTag('meta[property="og:image"]', 'property', 'og:image', ogImage);
-        setMetaTag('meta[property="og:site_name"]', 'property', 'og:site_name', 'Sri Srinivasa Canvassing');
+        setMetaTag('meta[property="og:description"]', 'property', 'og:description', finalDescription);
+        setMetaTag('meta[property="og:image"]', 'property', 'og:image', finalOgImage);
+        setMetaTag('meta[property="og:site_name"]', 'property', 'og:site_name', SITE_NAME);
 
         // Twitter Meta
         setMetaTag('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image');
         setMetaTag('meta[name="twitter:title"]', 'name', 'twitter:title', fullTitle);
-        setMetaTag('meta[name="twitter:description"]', 'name', 'twitter:description', description);
-        setMetaTag('meta[name="twitter:image"]', 'name', 'twitter:image', ogImage);
-    }, [title, description, ogType, ogImage, location.pathname, location.search]);
+        setMetaTag('meta[name="twitter:description"]', 'name', 'twitter:description', finalDescription);
+        setMetaTag('meta[name="twitter:image"]', 'name', 'twitter:image', finalOgImage);
+    }, [title, description, canonical, robots, ogType, ogImage, location.pathname]);
 };
 
 export default useMeta;

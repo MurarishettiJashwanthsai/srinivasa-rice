@@ -1,45 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, ShieldCheck, MapPin, Package, Truck, Calendar, DollarSign, FileText, ChevronRight } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ShieldCheck, MapPin, Package, Truck, Calendar, FileText, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { OptimizedImage } from '../components/OptimizedImage';
-import useMeta from '../hooks/useMeta';
 import { API_BASE_URL } from '../config/api';
-
-const SEEDED_VARIETIES_CATALOG = {
-    'sona-masuri-steam-bpt': { variety_name: 'Sona Masuri Steam(BPT)', current_price_mt: 5500.0, price_basis: 'EX_MILL', currency: 'INR', unit: 'MT', processing: '100% Sortexed', moisture: '12-14% Max', status: 'published', image_url: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=800' },
-    'sona-masuri-raw-bpt': { variety_name: 'Sona Masuri Raw(BPT)', current_price_mt: 5600.0, price_basis: 'EX_MILL', currency: 'INR', unit: 'MT', processing: '100% Sortexed', moisture: '12-14% Max', status: 'published', image_url: 'https://images.unsplash.com/photo-1536882240095-0379873feb4e?auto=format&fit=crop&q=80&w=800' },
-    'lachikari-raw-rice-jsr': { variety_name: 'Lachikari Raw Rice(JSR)', current_price_mt: 7900.0, price_basis: 'EX_MILL', currency: 'INR', unit: 'MT', processing: '100% Sortexed', moisture: '12-14% Max', status: 'published', image_url: 'https://images.unsplash.com/photo-1613589973273-fae710ae1ee7?auto=format&fit=crop&q=80&w=800' },
-    'rnr-steam': { variety_name: 'RNR Steam', current_price_mt: 5950.0, price_basis: 'EX_MILL', currency: 'INR', unit: 'MT', processing: '100% Sortexed', moisture: '12-14% Max', status: 'published', image_url: 'https://images.unsplash.com/photo-1568051243851-f9b18bc86134?auto=format&fit=crop&q=80&w=800' },
-    'jsr-steam-rice': { variety_name: 'JSR Steam Rice', current_price_mt: 6470.0, price_basis: 'EX_MILL', currency: 'INR', unit: 'MT', processing: '100% Sortexed', moisture: '12-14% Max', status: 'published', image_url: 'https://images.unsplash.com/photo-1569470984168-3069c9b5fdef?auto=format&fit=crop&q=80&w=800' },
-    'jsr-steem-rice': { variety_name: 'JSR Steam Rice', current_price_mt: 6470.0, price_basis: 'EX_MILL', currency: 'INR', unit: 'MT', processing: '100% Sortexed', moisture: '12-14% Max', status: 'published', image_url: 'https://images.unsplash.com/photo-1569470984168-3069c9b5fdef?auto=format&fit=crop&q=80&w=800' },
-    'sona-masuri-steam': { variety_name: 'Sona Masuri Steam(BPT)', current_price_mt: 5500.0, price_basis: 'EX_MILL', currency: 'INR', unit: 'MT', processing: '100% Sortexed', moisture: '12-14% Max', status: 'published', image_url: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=800' },
-    'sona-masuri-raw': { variety_name: 'Sona Masuri Raw(BPT)', current_price_mt: 5600.0, price_basis: 'EX_MILL', currency: 'INR', unit: 'MT', processing: '100% Sortexed', moisture: '12-14% Max', status: 'published', image_url: 'https://images.unsplash.com/photo-1536882240095-0379873feb4e?auto=format&fit=crop&q=80&w=800' },
-};
-
-const slugify = (text) => {
-    return text.toString().toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^\w-]+/g, '')
-        .replace(/--+/g, '-')
-        .replace(/^-+/, '')
-        .replace(/-+$/, '');
-};
+import { getCatalogProduct, slugifyProductName } from '../data/productCatalog';
 
 const ProductDetail = () => {
     const { slug } = useParams();
-    const [product, setProduct] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const catalogProduct = getCatalogProduct(slug);
+    const [product, setProduct] = useState(catalogProduct);
+    const [loading, setLoading] = useState(!catalogProduct);
     const [error, setError] = useState(false);
-
-    useMeta({
-        title: product ? `${product.variety_name} Rice Specifications — Export Quality` : 'Rice Variety Specifications',
-        description: product ? `Technical specifications, moisture content, sortexing and bulk export quote for ${product.variety_name} rice from Miryalaguda.` : 'View bulk export specifications for Indian rice varieties.',
-    });
 
     useEffect(() => {
         const fetchProduct = async () => {
-            setLoading(true);
+            if (!catalogProduct) setLoading(true);
             setError(false);
             const normSlug = slug ? slug.toLowerCase().trim() : '';
 
@@ -61,7 +37,7 @@ const ProductDetail = () => {
                 const listResponse = await fetch(`${API_BASE_URL}/api/products`);
                 if (listResponse.ok) {
                     const productsList = await listResponse.json();
-                    const matched = productsList.find(p => p.slug === normSlug || slugify(p.variety_name) === normSlug);
+                    const matched = productsList.find(p => p.slug === normSlug || slugifyProductName(p.variety_name) === normSlug);
                     if (matched) {
                         setProduct(matched);
                         setLoading(false);
@@ -73,8 +49,9 @@ const ProductDetail = () => {
             }
 
             // Tier 3: Check static fallback catalog for standard varieties
-            if (SEEDED_VARIETIES_CATALOG[normSlug]) {
-                setProduct(SEEDED_VARIETIES_CATALOG[normSlug]);
+            const fallbackProduct = getCatalogProduct(normSlug);
+            if (fallbackProduct) {
+                setProduct(fallbackProduct);
                 setError(false);
             } else {
                 setError(true);
@@ -83,7 +60,7 @@ const ProductDetail = () => {
         };
 
         if (slug) fetchProduct();
-    }, [slug]);
+    }, [slug, catalogProduct]);
 
     const fadeUp = {
         initial: { opacity: 0, y: 24 },

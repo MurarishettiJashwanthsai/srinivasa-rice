@@ -3,15 +3,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Mail, Phone, MapPin, Send, MessageCircle, Clock, CheckCircle2, ChevronRight, FileText, Linkedin } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { countries } from '../data/countries';
-import useMeta from '../hooks/useMeta';
 import { API_BASE_URL } from '../config/api';
 
 const Contact = () => {
-    useMeta({
-        title: 'Request a Bulk Rice Quote — Sri Srinivasa Canvassing',
-        description: 'Submit your required rice variety, quantity and packaging to request specifications and an official quotation.',
-    });
-
     const [searchParams] = useSearchParams();
     const initialProduct = searchParams.get('product') || 'Sona Masuri Steam';
 
