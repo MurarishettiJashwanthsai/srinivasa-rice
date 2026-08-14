@@ -1,4 +1,5 @@
 import os
+import uuid
 import pytest
 
 os.environ.setdefault("SECRET_KEY", "test-only-secret-key-that-is-not-used-in-production")
@@ -82,6 +83,58 @@ def test_rfq_honeypot_bot_filtering():
     assert response.status_code == 200
     data = response.json()
     assert data["request_id"] == "RFQ-BOT-FILTERED"
+
+def test_admin_leads_hide_demo_rows_without_deleting_them():
+    login_resp = client.post(
+        "/api/admin/login",
+        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]}
+    )
+    assert login_resp.status_code == 200
+    headers = {"Authorization": f"Bearer {login_resp.json()['access_token']}"}
+
+    demo_request_id = "RFQ-2026-A1B2"
+    genuine_request_id = f"RFQ-TEST-{uuid.uuid4().hex[:8].upper()}"
+    db = SessionLocal()
+    created_demo = False
+    try:
+        demo_lead = db.query(Lead).filter(Lead.request_id == demo_request_id).first()
+        if demo_lead is None:
+            demo_lead = Lead(
+                request_id=demo_request_id,
+                name="Demo Inquiry",
+                company="Demo Company",
+                whatsapp="+910000000000",
+                inquiry_text="Demo row that must not be returned.",
+                status="new",
+                source_page="contact"
+            )
+            db.add(demo_lead)
+            created_demo = True
+
+        genuine_lead = Lead(
+            request_id=genuine_request_id,
+            name="Genuine Inquiry",
+            company="Genuine Company",
+            whatsapp="+919999999999",
+            inquiry_text="Genuine stored inquiry.",
+            status="new",
+            source_page="contact"
+        )
+        db.add(genuine_lead)
+        db.commit()
+
+        response = client.get("/api/leads", headers=headers)
+        assert response.status_code == 200
+        returned_request_ids = {lead["request_id"] for lead in response.json()}
+        assert genuine_request_id in returned_request_ids
+        assert demo_request_id not in returned_request_ids
+        assert db.query(Lead).filter(Lead.request_id == demo_request_id).first() is not None
+    finally:
+        db.query(Lead).filter(Lead.request_id == genuine_request_id).delete()
+        if created_demo:
+            db.query(Lead).filter(Lead.request_id == demo_request_id).delete()
+        db.commit()
+        db.close()
 
 def test_admin_login_and_price_update_audit():
     # Login

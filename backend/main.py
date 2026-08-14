@@ -38,6 +38,12 @@ FALLBACK_ADMIN_USERNAME = "srinivasulu@srinivascanvassing.com"
 FALLBACK_ADMIN_PASSWORD_ROUNDS = 600_000
 FALLBACK_ADMIN_PASSWORD_SALT = bytes.fromhex("5ee1f3848467a4b6bfd0df62f219e7b4")
 FALLBACK_ADMIN_PASSWORD_HASH = "34a5a9efb6717b6ea9e1c7378557c53dad4770fc5fc9be1273b95d479a780db1"
+DEMO_LEAD_REQUEST_IDS = {
+    "RFQ-2026-A1B2",
+    "RFQ-2026-C3D4",
+    "RFQ-2026-E5F6",
+    "RFQ-2026-G7H8",
+}
 
 
 def verify_fallback_admin_password(password: str) -> bool:
@@ -138,87 +144,6 @@ def init_db():
         if updated:
             db.commit()
 
-        try:
-            lead_count = db.query(Lead).count()
-        except Exception:
-            db.rollback()
-            lead_count = 0
-
-        if lead_count == 0:
-            current_time = datetime.datetime.now().isoformat()
-            seed_leads = [
-                Lead(
-                    request_id="RFQ-2026-A1B2",
-                    name="Rajesh Kumar",
-                    company="Sri Laxmi Traders",
-                    email="rajesh@srilaxmitraders.com",
-                    whatsapp="+919866760028",
-                    destination_country="India",
-                    destination_port="Chennai Port",
-                    product_name="Sona Masuri Steam",
-                    quantity_mt=50.0,
-                    packaging_type="50kg PP Bag",
-                    incoterm="FOB",
-                    inquiry_text="Interested in 50 MT Sona Masuri Steam rice export quality. Please share latest FOB price quote.",
-                    status="contacted",
-                    source_page="contact",
-                    created_at=current_time
-                ),
-                Lead(
-                    request_id="RFQ-2026-C3D4",
-                    name="Ahmed Al-Mansoor",
-                    company="Al-Khaleej Foodstuffs LLC",
-                    email="ahmed@alkhaleejfood.ae",
-                    whatsapp="+919866760028",
-                    destination_country="UAE",
-                    destination_port="Jebel Ali Port",
-                    product_name="1121 Basmati Sella",
-                    quantity_mt=100.0,
-                    packaging_type="50kg PP Bag",
-                    incoterm="CIF",
-                    inquiry_text="Looking for regular supply of 1121 Basmati Sella 50kg PP bags to Jebel Ali. Need CIF Dubai rate.",
-                    status="in_progress",
-                    source_page="contact",
-                    created_at=current_time
-                ),
-                Lead(
-                    request_id="RFQ-2026-E5F6",
-                    name="Venkatesh Rao",
-                    company="Rao Global Impex",
-                    email="vrao@raoglobalimpex.com",
-                    whatsapp="+919866760028",
-                    destination_country="India",
-                    destination_port="Visakhapatnam Port",
-                    product_name="IR64 5% Broken",
-                    quantity_mt=200.0,
-                    packaging_type="50kg PP Bag",
-                    incoterm="FOB",
-                    inquiry_text="Require 200 MT IR64 5% Broken Non-Basmati Rice for immediate shipment. Please send specifications.",
-                    status="new",
-                    source_page="contact",
-                    created_at=current_time
-                ),
-                Lead(
-                    request_id="RFQ-2026-G7H8",
-                    name="Karthik Sharma",
-                    company="South Asia Grain Corp",
-                    email="karthik@southasiagrain.com",
-                    whatsapp="+919866760028",
-                    destination_country="Singapore",
-                    destination_port="Jurong Port",
-                    product_name="Sona Masuri Raw",
-                    quantity_mt=25.0,
-                    packaging_type="25kg Non-Woven Bag",
-                    incoterm="CIF",
-                    inquiry_text="Requesting price quote and moisture report for Sona Masuri Raw 25kg non-woven bag packaging.",
-                    status="new",
-                    source_page="contact",
-                    created_at=current_time
-                ),
-            ]
-            for lead in seed_leads:
-                db.add(lead)
-            db.commit()
     finally:
         db.close()
 
@@ -694,7 +619,7 @@ async def get_leads(
     db: Session = Depends(get_db)
 ):
     leads = db.query(Lead).order_by(Lead.id.desc()).all()
-    return leads
+    return [lead for lead in leads if lead.request_id not in DEMO_LEAD_REQUEST_IDS]
 
 @app.get("/api/rate-audit-logs")
 async def get_rate_audit_logs(
