@@ -22,6 +22,7 @@ import ScrollToTop from './components/ScrollToTop';
 import SkipLink from './components/SkipLink';
 import StructuredData from './components/StructuredData';
 import ErrorBoundary from './components/ErrorBoundary';
+import Analytics from './components/Analytics';
 
 // Admin-only pages remain code split; public pages are synchronously renderable at build time.
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
@@ -57,6 +58,7 @@ export function AppContent() {
             <SkipLink />
             <ScrollToTop />
             <StructuredData />
+            <Analytics />
             <Toaster
                 position="top-right"
                 toastOptions={{
