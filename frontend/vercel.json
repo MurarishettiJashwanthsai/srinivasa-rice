@@ -19,11 +19,19 @@
     ],
     "rewrites": [
         {
+            "source": "/sitemap.xml",
+            "destination": "/api/sitemap"
+        },
+        {
             "source": "/admin/:path*",
             "destination": "/index.html"
         },
         {
             "source": "/card/:path*",
+            "destination": "/index.html"
+        },
+        {
+            "source": "/products/:path*",
             "destination": "/index.html"
         }
     ]
