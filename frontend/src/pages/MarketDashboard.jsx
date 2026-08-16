@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import GlassCard from '../components/GlassCard';
 import { SkeletonTableRow, SkeletonStat } from '../components/SkeletonLoader';
 import { API_BASE_URL } from '../config/api';
+import { getRateUnitShortLabel } from '../utils/rateUnits';
 
 const MarketDashboard = () => {
     const [prices, setPrices] = useState([]);
@@ -133,7 +134,7 @@ const MarketDashboard = () => {
                         >
                             <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em] mb-2 truncate">{item.variety_name}</p>
                             <p className="text-2xl font-display font-black text-text-main mb-1">₹{item.current_price_mt.toFixed(0)}</p>
-                            <span className="text-[9px] font-black uppercase text-text-subtle block mb-3">Ex-Mill / {item.unit || 'MT'}</span>
+                            <span className="text-[9px] font-black uppercase text-text-subtle block mb-3">Ex-Mill / {getRateUnitShortLabel(item.unit)}</span>
                             <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest border ${trendBg(item.trend)} ${trendColor(item.trend)}`}>
                                 {item.trend === 'up' && <TrendingUp className="w-3.5 h-3.5" />}
                                 {item.trend === 'down' && <TrendingDown className="w-3.5 h-3.5" />}
@@ -165,9 +166,9 @@ const MarketDashboard = () => {
                                 {loading ? Array.from({ length: 5 }).map((_, i) => <SkeletonTableRow key={i} cols={5} />) : sortedPrices.map((item) => (
                                     <tr key={item.id} className="hover:bg-primary/5 transition-colors">
                                         <td className="py-4 px-8 font-black text-text-main">{item.variety_name}</td>
-                                        <td className="py-4 px-8 font-black text-xl text-primary">₹{item.current_price_mt.toFixed(0)}</td>
-                                        <td className="py-4 px-8 font-bold text-text-muted">₹{item.previous_price_mt.toFixed(0)}</td>
-                                        <td className="py-4 px-8 font-bold text-xs text-text-muted">{item.price_basis || 'EX_MILL'} · {item.unit || 'MT'} ({item.currency || 'INR'})</td>
+                                        <td className="py-4 px-8 font-black text-xl text-primary">₹{item.current_price_mt.toFixed(0)} / {getRateUnitShortLabel(item.unit)}</td>
+                                        <td className="py-4 px-8 font-bold text-text-muted">₹{item.previous_price_mt.toFixed(0)} / {getRateUnitShortLabel(item.unit)}</td>
+                                        <td className="py-4 px-8 font-bold text-xs text-text-muted">{item.price_basis || 'EX_MILL'} · {getRateUnitShortLabel(item.unit)} ({item.currency || 'INR'})</td>
                                         <td className="py-4 px-8 text-center">
                                             <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-[0.1em] border ${trendBg(item.trend)} ${trendColor(item.trend)}`}>
                                                 {item.trend === 'up' && <TrendingUp className="h-4 w-4" />}

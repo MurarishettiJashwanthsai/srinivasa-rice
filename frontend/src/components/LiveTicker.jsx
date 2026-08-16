@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
+import { getRateUnitShortLabel } from '../utils/rateUnits';
 
 const LiveTicker = () => {
     const [prices, setPrices] = useState([]);
@@ -40,7 +41,7 @@ const LiveTicker = () => {
     const PriceItem = ({ item, keyPrefix = '' }) => (
         <div key={`${keyPrefix}${item.id}`} className="flex items-center gap-2.5 mx-6 text-sm font-medium shrink-0">
             <span className="text-gray-400 font-medium">{item.variety_name}</span>
-            <span className="text-white font-bold">₹{item.current_price_mt}/MT</span>
+            <span className="text-white font-bold">₹{item.current_price_mt}/{getRateUnitShortLabel(item.unit)}</span>
             <span className={`flex items-center gap-0.5 text-xs font-bold ${trendColor(item.trend)}`}>
                 <TrendIcon trend={item.trend} />
                 {item.trend === 'up' ? '+' : ''}{item.percentage_change}%

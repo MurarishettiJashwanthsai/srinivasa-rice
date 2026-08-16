@@ -7,6 +7,7 @@ import { SkeletonCard } from '../components/SkeletonLoader';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { API_BASE_URL } from '../config/api';
 import { PRODUCT_CATALOG } from '../data/productCatalog';
+import { getRateUnitShortLabel } from '../utils/rateUnits';
 
 const Products = () => {
     const [products, setProducts] = useState(PRODUCT_CATALOG);
@@ -94,7 +95,7 @@ const Products = () => {
                                             <div className="flex justify-between items-center">
                                                 <span className="text-[10px] font-black text-text-muted dark:text-gray-400 uppercase tracking-wider">Indicative Rate (Ex-Mill)</span>
                                                 <span className="text-sm font-black text-emerald bg-emerald/10 px-3 py-1 rounded-lg border border-emerald/20">
-                                                    ₹{product.current_price_mt ? product.current_price_mt.toLocaleString() : 'N/A'} / MT
+                                                    ₹{product.current_price_mt ? product.current_price_mt.toLocaleString() : 'N/A'} / {getRateUnitShortLabel(product.unit)}
                                                 </span>
                                             </div>
                                         </div>

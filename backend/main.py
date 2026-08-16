@@ -45,6 +45,27 @@ DEMO_LEAD_REQUEST_IDS = {
     "RFQ-2026-G7H8",
 }
 
+ALLOWED_RATE_UNITS = {
+    "MT",
+    "QUINTAL",
+    "KG",
+    "SHORT_TON",
+    "LONG_TON",
+    "BAG_50KG",
+    "BAG_25KG",
+}
+
+
+def validate_rate_unit(value: Optional[str]) -> str:
+    unit = (value or "MT").strip().upper()
+    if unit not in ALLOWED_RATE_UNITS:
+        allowed = ", ".join(sorted(ALLOWED_RATE_UNITS))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported quantity unit. Choose one of: {allowed}",
+        )
+    return unit
+
 
 def verify_fallback_admin_password(password: str) -> bool:
     candidate_hash = hashlib.pbkdf2_hmac(
@@ -223,6 +244,7 @@ class ContactForm(BaseModel):
 class ProductAdd(BaseModel):
     name: str
     initial_price: float
+    unit: Optional[str] = "MT"
     moisture: Optional[str] = "12-14% Max"
     processing: Optional[str] = "100% Sortexed"
 
@@ -338,6 +360,7 @@ async def save_image_file(image: UploadFile) -> Optional[str]:
 async def add_product(
     name: str = Form(...),
     initial_price: float = Form(...),
+    unit: str = Form("MT"),
     moisture: str = Form("12-14% Max"),
     processing: str = Form("100% Sortexed"),
     image: Optional[UploadFile] = File(None),
@@ -346,6 +369,7 @@ async def add_product(
 ):
     current_time = datetime.datetime.now().isoformat()
     image_url = None
+    normalized_unit = validate_rate_unit(unit)
     
     if image:
         image_url = await save_image_file(image)
@@ -362,6 +386,7 @@ async def add_product(
             image_url=image_url,
             moisture=moisture,
             processing=processing,
+            unit=normalized_unit,
             status="published",
             updated_by=current_user
         )
@@ -403,6 +428,7 @@ async def update_product(
     previous_price = row.current_price_mt
     current_price = product.new_price_mt
     variety_name = product.name if product.name else row.variety_name
+    normalized_unit = validate_rate_unit(product.unit) if product.unit is not None else None
     
     if previous_price > 0:
         percentage_change = ((current_price - previous_price) / previous_price) * 100
@@ -444,8 +470,8 @@ async def update_product(
             row.price_basis = product.price_basis
         if product.currency is not None:
             row.currency = product.currency
-        if product.unit is not None:
-            row.unit = product.unit
+        if normalized_unit is not None:
+            row.unit = normalized_unit
         if product.public_note is not None:
             row.public_note = product.public_note
         if product.internal_note is not None:
@@ -482,6 +508,7 @@ async def update_product(
         "last_updated": row.last_updated,
         "moisture": row.moisture,
         "processing": row.processing,
+        "unit": row.unit,
         "status": row.status
     }
 

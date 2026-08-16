@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { API_BASE_URL } from '../config/api';
 import { getCatalogProduct, slugifyProductName } from '../data/productCatalog';
+import { getRateUnitShortLabel } from '../utils/rateUnits';
 
 const ProductDetail = () => {
     const { slug } = useParams();
@@ -171,7 +172,7 @@ const ProductDetail = () => {
                                     <span className="text-3xl font-display font-black text-emerald">
                                         ₹{product?.current_price_mt ? Number(product.current_price_mt).toLocaleString() : 'N/A'}
                                     </span>
-                                    <span className="text-xs font-black text-text-muted">/ {product?.unit || 'MT'} ({product?.currency || 'INR'})</span>
+                                    <span className="text-xs font-black text-text-muted">/ {getRateUnitShortLabel(product?.unit)} ({product?.currency || 'INR'})</span>
                                 </div>
                                 <p className="text-[10px] font-black text-text-subtle uppercase tracking-widest mt-1">
                                     Rates subject to daily market fluctuations. Contact for binding quotation.

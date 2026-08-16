@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, FileText, Megaphone, BarChart3, Search, Send, Tag, Phone, ArrowLeft, Users, Clock, ChevronRight, Copy, Bell, BellRing } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
 import useInquiryNotifications from '../hooks/useInquiryNotifications';
+import { getRateUnitShortLabel } from '../utils/rateUnits';
 
 const API = API_BASE_URL;
 
@@ -35,7 +36,7 @@ const WhatsAppCRM = () => {
         { id: 1, name: 'Daily Price Alert', category: 'pricing', content: '🚨 *Sri Srinivasa Canvassing* 🚨\n📍 Miryalaguda Live Market Rates\n📅 Date: {date}\n\n{prices}\n\nReply to lock your indent!' },
         { id: 2, name: 'Welcome Message', category: 'onboarding', content: "👋 Welcome to Sri Srinivasa Canvassing!\n\nWe're India's premium rice sourcing & export partner.\n\nHow can we help you today?" },
         { id: 3, name: 'Follow-up', category: 'sales', content: "Hi {buyer_name},\n\nHope you're doing well! Just checking in on your rice requirement." },
-        { id: 4, name: 'Quote Confirmation', category: 'sales', content: "Dear {buyer_name},\n\nThank you for your interest!\n\n📋 *Quote Details*\nVariety: {variety}\nQuantity: {quantity}\nPrice: {price}/MT FOB" },
+        { id: 4, name: 'Quote Confirmation', category: 'sales', content: "Dear {buyer_name},\n\nThank you for your interest!\n\n📋 *Quote Details*\nVariety: {variety}\nQuantity: {quantity}\nPrice: {price}/{unit} FOB" },
     ];
 
     const fetchLeads = useCallback(async () => {
@@ -71,7 +72,7 @@ const WhatsAppCRM = () => {
     const generatePriceList = () => {
         const date = new Date().toLocaleDateString('en-IN');
         let msg = `🚨 *Sri Srinivasa Canvassing* 🚨\n📍 Miryalaguda Live Market Rates\n📅 Date: ${date}\n\n`;
-        products.forEach(p => { msg += `🌾 *${p.variety_name}*: ₹${p.current_price_mt}/MT\n`; });
+        products.forEach(p => { msg += `🌾 *${p.variety_name}*: ₹${p.current_price_mt}/${getRateUnitShortLabel(p.unit)}\n`; });
         msg += `\nPrices are indicative & subject to change.\nReply to lock your indent!`;
         setBroadcastMessage(msg);
     };

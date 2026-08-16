@@ -153,6 +153,7 @@ def test_admin_login_and_price_update_audit():
     # Update Price
     update_payload = {
         "new_price_mt": 890.0,
+        "unit": "QUINTAL",
         "reason": "Test Price Audit Entry",
         "confirm_unusual_rate": True
     }
@@ -160,6 +161,7 @@ def test_admin_login_and_price_update_audit():
     assert update_resp.status_code == 200
     updated_prod = update_resp.json()
     assert updated_prod["current_price_mt"] == 890.0
+    assert updated_prod["unit"] == "QUINTAL"
 
     # Verify Rate Audit Log
     logs_resp = client.get("/api/rate-audit-logs", headers=headers)
@@ -205,3 +207,25 @@ def test_unusual_rate_warning():
     }
     confirm_resp = client.put(f"/api/products/update/{prod_id}", json=confirm_payload, headers=headers)
     assert confirm_resp.status_code == 200
+
+def test_rejects_ambiguous_or_unsupported_rate_unit():
+    login_resp = client.post(
+        "/api/admin/login",
+        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]}
+    )
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    product = client.get("/api/products").json()[0]
+
+    response = client.put(
+        f"/api/products/update/{product['id']}",
+        json={
+            "new_price_mt": product["current_price_mt"],
+            "unit": "TON",
+            "confirm_unusual_rate": True,
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 400
+    assert "Unsupported quantity unit" in response.json()["detail"]

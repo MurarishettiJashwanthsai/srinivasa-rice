@@ -4,17 +4,19 @@ import toast from 'react-hot-toast';
 import { Trash2, Plus, Edit2, Check, X, ImagePlus, Users, MessageSquareShare, MessageCircle, CreditCard, Search, Building2, Phone, Calendar, MessageSquare, ChevronDown, ChevronUp, Bell, BellRing } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
 import useInquiryNotifications from '../hooks/useInquiryNotifications';
+import { RATE_UNIT_OPTIONS, getRateUnitShortLabel } from '../utils/rateUnits';
 
 const AdminDashboard = () => {
     const [activeTab, setActiveTab] = useState('inventory');
     const [leads, setLeads] = useState([]);
     const [broadcastMessage, setBroadcastMessage] = useState('');
     const [products, setProducts] = useState([]);
-    const [newVariety, setNewVariety] = useState({ name: '', initial_price: '' });
+    const [newVariety, setNewVariety] = useState({ name: '', initial_price: '', unit: 'MT' });
     const [newImage, setNewImage] = useState(null);
     const [editingId, setEditingId] = useState(null);
     const [editPrice, setEditPrice] = useState('');
     const [editName, setEditName] = useState('');
+    const [editUnit, setEditUnit] = useState('MT');
     const [inquirySearch, setInquirySearch] = useState('');
     const [expandedInquiry, setExpandedInquiry] = useState(null);
 
@@ -71,7 +73,7 @@ const AdminDashboard = () => {
     const generateBroadcast = () => {
         const date = new Date().toLocaleDateString('en-IN');
         let msg = `🚨 *Sri Srinivasa Canvassing* 🚨\n📍 Miryalaguda Live Market Rates\n📅 Date: ${date}\n\n`;
-        products.forEach(p => { msg += `🌾 *${p.variety_name}*: ₹${p.current_price_mt}/MT\n`; });
+        products.forEach(p => { msg += `🌾 *${p.variety_name}*: ₹${p.current_price_mt}/${getRateUnitShortLabel(p.unit)}\n`; });
         msg += `\nPrices are indicative & subject to immediate change based on mill availability.\n\nReply to lock your indent!`;
         setBroadcastMessage(msg);
     };
@@ -84,13 +86,14 @@ const AdminDashboard = () => {
         const formData = new FormData();
         formData.append('name', newVariety.name);
         formData.append('initial_price', parseFloat(newVariety.initial_price));
+        formData.append('unit', newVariety.unit);
         if (newImage) formData.append('image', newImage);
         try {
             const res = await fetch(`${API}/api/products/add`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData });
             if (res.ok) { 
                 const added = await res.json();
                 toast.success(`${newVariety.name} added`); 
-                setNewVariety({ name: '', initial_price: '' }); 
+                setNewVariety({ name: '', initial_price: '', unit: 'MT' });
                 setNewImage(null); 
                 const fi = document.getElementById('new-image-input'); 
                 if (fi) fi.value = ''; 
@@ -106,7 +109,7 @@ const AdminDashboard = () => {
         } catch { toast.error('Network error'); }
     };
 
-    const handleSaveUpdate = async (id, confirmUnusual = true) => {
+    const handleSaveUpdate = async (id, confirmUnusual = false) => {
         try {
             const res = await fetch(`${API}/api/products/update/${id}`, { 
                 method: 'PUT', 
@@ -114,6 +117,7 @@ const AdminDashboard = () => {
                 body: JSON.stringify({ 
                     name: editName, 
                     new_price_mt: parseFloat(editPrice),
+                    unit: editUnit,
                     confirm_unusual_rate: confirmUnusual
                 }) 
             });
@@ -233,8 +237,14 @@ const AdminDashboard = () => {
                                     <input type="text" required value={newVariety.name} onChange={e => setNewVariety({ ...newVariety, name: e.target.value })} placeholder="e.g. Sona Masuri" className={inputClass} />
                                 </div>
                                 <div className="flex-1 w-full md:max-w-xs">
-                                    <label className="block text-sm font-medium text-text-muted dark:text-gray-400 mb-1">Price (₹/MT)</label>
+                                    <label className="block text-sm font-medium text-text-muted dark:text-gray-400 mb-1">Indicative Price (₹)</label>
                                     <input type="number" step="0.01" required value={newVariety.initial_price} onChange={e => setNewVariety({ ...newVariety, initial_price: e.target.value })} placeholder="0.00" className={inputClass} />
+                                </div>
+                                <div className="flex-1 w-full md:max-w-xs">
+                                    <label className="block text-sm font-medium text-text-muted dark:text-gray-400 mb-1">Quantity Unit</label>
+                                    <select value={newVariety.unit} onChange={e => setNewVariety({ ...newVariety, unit: e.target.value })} className={inputClass}>
+                                        {RATE_UNIT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                    </select>
                                 </div>
                                 <div className="flex-1 w-full md:max-w-xs">
                                     <label className="block text-sm font-medium text-text-muted dark:text-gray-400 mb-1">Image</label>
@@ -250,7 +260,7 @@ const AdminDashboard = () => {
                                 <table className="w-full text-left">
                                     <thead>
                                         <tr className="border-b border-border dark:border-white/10 text-xs uppercase tracking-wider text-text-muted dark:text-gray-400 font-semibold">
-                                            <th className="py-4 px-6">Image</th><th className="py-4 px-6">ID</th><th className="py-4 px-6">Variety</th><th className="py-4 px-6">Price (₹/MT)</th><th className="py-4 px-6">Updated</th><th className="py-4 px-6 text-center">Actions</th>
+                                            <th className="py-4 px-6">Image</th><th className="py-4 px-6">ID</th><th className="py-4 px-6">Variety</th><th className="py-4 px-6">Price (₹)</th><th className="py-4 px-6">Quantity Unit</th><th className="py-4 px-6">Updated</th><th className="py-4 px-6 text-center">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border dark:divide-white/5">
@@ -269,6 +279,13 @@ const AdminDashboard = () => {
                                                 <td className="py-4 px-6 text-sm">
                                                     {editingId === item.id ? <input type="number" step="0.01" value={editPrice} onChange={e => setEditPrice(e.target.value)} className={`${inputClass} w-28`} autoFocus /> : <span className="font-bold text-emerald">₹{item.current_price_mt.toFixed(2)}</span>}
                                                 </td>
+                                                <td className="py-4 px-6 text-sm">
+                                                    {editingId === item.id ? (
+                                                        <select value={editUnit} onChange={e => setEditUnit(e.target.value)} className={`${inputClass} min-w-[190px]`}>
+                                                            {RATE_UNIT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                                        </select>
+                                                    ) : <span className="font-bold text-text-main">{getRateUnitShortLabel(item.unit)}</span>}
+                                                </td>
                                                 <td className="py-4 px-6 text-sm text-text-muted dark:text-gray-400">{new Date(item.last_updated).toLocaleString()}</td>
                                                 <td className="py-4 px-6 text-center">
                                                     <div className="flex justify-center items-center gap-2">
@@ -278,14 +295,14 @@ const AdminDashboard = () => {
                                                                 <button onClick={() => setEditingId(null)} className="p-1.5 rounded-lg bg-gray-100 dark:bg-white/5 text-text-muted hover:bg-gray-200 dark:hover:bg-white/10 transition-colors" title="Cancel"><X className="w-4 h-4" /></button>
                                                             </>
                                                         ) : (
-                                                            <button onClick={() => { setEditingId(item.id); setEditPrice(item.current_price_mt.toString()); setEditName(item.variety_name); }} className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors" title="Edit"><Edit2 className="w-4 h-4" /></button>
+                                                            <button onClick={() => { setEditingId(item.id); setEditPrice(item.current_price_mt.toString()); setEditName(item.variety_name); setEditUnit(item.unit || 'MT'); }} className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors" title="Edit"><Edit2 className="w-4 h-4" /></button>
                                                         )}
                                                         <button onClick={() => handleDelete(item.id, item.variety_name)} className="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors" title="Delete"><Trash2 className="w-4 h-4" /></button>
                                                     </div>
                                                 </td>
                                             </tr>
                                         ))}
-                                        {products.length === 0 && <tr><td colSpan="6" className="py-12 text-center text-text-muted">No products found.</td></tr>}
+                                        {products.length === 0 && <tr><td colSpan="7" className="py-12 text-center text-text-muted">No products found.</td></tr>}
                                     </tbody>
                                 </table>
                             </div>

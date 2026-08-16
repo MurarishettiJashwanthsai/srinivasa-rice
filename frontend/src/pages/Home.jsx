@@ -8,6 +8,7 @@ import OptimizedImage from '../components/OptimizedImage';
 import { countries } from '../data/countries';
 import { API_BASE_URL } from '../config/api';
 import { PRODUCT_CATALOG } from '../data/productCatalog';
+import { getRateUnitShortLabel } from '../utils/rateUnits';
 
 const Home = () => {
     const [name, setName] = useState('');
@@ -234,7 +235,7 @@ const Home = () => {
                                             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                                         />
                                         <div className="absolute bottom-4 left-4 px-4 py-2 rounded-xl bg-background/90 backdrop-blur-md text-primary text-sm font-black shadow-xl">
-                                            ₹{product.current_price_mt}/MT
+                                            ₹{product.current_price_mt}/{getRateUnitShortLabel(product.unit)}
                                         </div>
                                     </div>
                                     <div className="p-6 flex-grow flex flex-col">
@@ -299,7 +300,7 @@ const Home = () => {
                                 <thead>
                                     <tr className="bg-background text-text-main text-xs uppercase tracking-[0.2em]">
                                         <th scope="col" className="py-6 px-8 font-black">Rice Variety</th>
-                                        <th scope="col" className="py-6 px-8 font-black">Price (₹/MT)</th>
+                                        <th scope="col" className="py-6 px-8 font-black">Indicative Price</th>
                                         <th scope="col" className="py-6 px-8 font-black text-center">Trend</th>
                                     </tr>
                                 </thead>
@@ -307,7 +308,7 @@ const Home = () => {
                                     {products.slice(0, 5).map((item) => (
                                         <tr key={item.id} className="hover:bg-primary/5 transition-colors">
                                             <td className="py-6 px-8 font-black text-text-main">{item.variety_name}</td>
-                                            <td className="py-6 px-8 font-black text-2xl text-primary">₹{item.current_price_mt.toFixed(0)}</td>
+                                            <td className="py-6 px-8 font-black text-2xl text-primary">₹{item.current_price_mt.toFixed(0)} / {getRateUnitShortLabel(item.unit)}</td>
                                             <td className="py-6 px-8 text-center">
                                                 <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest ${item.trend === 'up' ? 'bg-emerald-500/10 text-emerald-500' : item.trend === 'down' ? 'bg-red-500/10 text-red-500' : 'bg-text-muted/10 text-text-muted'}`}>
                                                     {item.trend === 'up' ? <TrendingUp className="w-4 h-4" /> : item.trend === 'down' ? '▼' : '—'} {item.percentage_change}%
