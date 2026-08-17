@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Globe2, ShieldCheck, Box, MessageCircle, Send, TrendingUp, Truck, Users, Wheat, ChevronRight } from 'lucide-react';
+import { ArrowRight, Globe2, ShieldCheck, Box, MessageCircle, Send, TrendingUp, TrendingDown, Minus, Truck, Users, Wheat, ChevronRight, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import GlassCard from '../components/GlassCard';
@@ -32,6 +32,8 @@ const Home = () => {
             } catch (e) { console.error(e); }
         };
         fetchProducts();
+        const interval = setInterval(fetchProducts, 30000);
+        return () => clearInterval(interval);
     }, []);
 
     const handleSubscribe = async (e) => {
@@ -234,6 +236,55 @@ const Home = () => {
                                 Subscription reference: <span className="font-mono">{subscriptionReference}</span>
                             </p>
                         )}
+
+                        {/* Live Market Intelligence Rates Grid */}
+                        {products && products.length > 0 && (
+                            <div className="mt-12 pt-10 border-t border-primary/10">
+                                <div className="flex items-center justify-between mb-6 text-left">
+                                    <div>
+                                        <h3 className="text-xl font-display font-black text-text-main uppercase">Live Market Rates Overview</h3>
+                                        <p className="text-xs font-bold text-text-muted">Updated dynamically from certified Miryalaguda mills</p>
+                                    </div>
+                                    <Link to="/market-rates" className="text-xs font-black uppercase text-primary hover:underline flex items-center gap-1">
+                                        View Full Market Desk <ChevronRight className="w-4 h-4" />
+                                    </Link>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-left">
+                                    {products.slice(0, 8).map((prod) => {
+                                        const isUp = prod.trend === 'up';
+                                        const isDown = prod.trend === 'down';
+                                        const unitLabel = getRateUnitShortLabel(prod.unit);
+                                        return (
+                                            <div key={prod.id} className="p-4 rounded-2xl bg-surface/90 dark:bg-secondary-light/40 border border-border/50 backdrop-blur-md flex flex-col justify-between hover:border-primary/40 transition-all shadow-sm">
+                                                <div className="flex items-center justify-between gap-2 mb-3">
+                                                    <span className="text-xs font-black text-text-main dark:text-white truncate" title={prod.variety_name}>
+                                                        {prod.variety_name}
+                                                    </span>
+                                                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase flex items-center gap-0.5 shrink-0 ${
+                                                        isUp ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' :
+                                                        isDown ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20' :
+                                                        'bg-gray-500/10 text-gray-500 border border-gray-500/20'
+                                                    }`}>
+                                                        {isUp && <TrendingUp className="w-3 h-3" />}
+                                                        {isDown && <TrendingDown className="w-3 h-3" />}
+                                                        {!isUp && !isDown && <Minus className="w-3 h-3" />}
+                                                        {prod.percentage_change ? `${prod.percentage_change > 0 ? '+' : ''}${prod.percentage_change}%` : 'STABLE'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-baseline justify-between pt-2 border-t border-border/30">
+                                                    <span className="text-lg font-black text-primary font-display">
+                                                        ₹{prod.current_price_mt?.toLocaleString()}
+                                                    </span>
+                                                    <span className="text-[10px] font-black text-text-muted uppercase">
+                                                        /{unitLabel}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </motion.div>
             </section>
@@ -278,6 +329,13 @@ const Home = () => {
                             );
                         })}
                     </div>
+                    {products.length > 8 && (
+                        <div className="mt-12 text-center">
+                            <Link to="/products" className="button-primary inline-flex items-center gap-2 text-base font-black px-8 py-4">
+                                View Full Catalogue ({products.length} Varieties) <ArrowRight className="w-5 h-5" />
+                            </Link>
+                        </div>
+                    )}
                 </div>
             </section>
 
