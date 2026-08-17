@@ -10,9 +10,9 @@ const Certifications = () => {
     ];
 
     const MillCredentials = [
-        { icon: Factory, title: 'ISO 9001:2015 Facilities', entity: 'Partner Millers', desc: 'Our canvassed milling partners in Miryalaguda maintain certified Quality Management Systems for raw paddy processing and sortex milling.' },
-        { icon: CheckCircle, title: 'HACCP & ISO 22000', entity: 'Partner Millers', desc: 'Partner mills follow Hazard Analysis Critical Control Point (HACCP) systems ensuring clean processing, destoning, and moisture control.' },
-        { icon: Building2, title: 'Bühler Sortex Facilities', entity: 'Partner Millers', desc: 'High-precision color sorting technology utilized at partner facilities to eliminate discolored grains and chalky kernels.' },
+        { icon: Factory, title: 'ISO 9001:2015 Facilities', entity: 'Selected Milling Facilities', desc: 'Quality-management documentation can be reviewed for the selected milling facility before a commercial order is finalized.' },
+        { icon: CheckCircle, title: 'HACCP & ISO 22000', entity: 'Selected Milling Facilities', desc: 'Processing and food-safety documentation is confirmed according to the buyer’s product and contract requirements.' },
+        { icon: Building2, title: 'Bühler Sortex Facilities', entity: 'Selected Milling Facilities', desc: 'Colour-sorting capability and the final specification are confirmed for the selected grade before quotation.' },
     ];
 
     return (
@@ -22,7 +22,7 @@ const Certifications = () => {
                     <h1 className="text-3xl md:text-5xl font-display font-black text-text-main dark:text-white tracking-tight mb-4 uppercase">Quality & Credentials</h1>
                     <div className="w-16 h-1 bg-primary mx-auto rounded-full mb-6" />
                     <p className="max-w-2xl mx-auto text-base text-text-muted dark:text-gray-400 font-bold leading-relaxed">
-                        Complete transparency between our merchant export registrations and our network of certified partner milling facilities in Miryalaguda.
+                        Clear separation between our merchant export registrations and the documented capabilities of selected milling facilities in Miryalaguda.
                     </p>
                 </motion.div>
 

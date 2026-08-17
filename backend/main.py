@@ -1,49 +1,60 @@
 import datetime
 import hashlib
 import hmac
+import io
 import os
+import re
 import secrets
 import warnings
 import jwt
-from fastapi import FastAPI, HTTPException, Depends, status, File, UploadFile, Form
+from fastapi import FastAPI, HTTPException, Depends, status, File, UploadFile, Form, Request, Response
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response as FastAPIResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from typing import Optional
+from xml.sax.saxutils import escape as xml_escape
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
 import cloudinary
-import cloudinary.uploader
 import httpx
+from dotenv import load_dotenv
 
 from database import engine, Base, get_db
-from models import RicePrice, Lead
+from models import RicePrice, Lead, RateAuditLog, AdminSession, AdminLoginHistory
 
-SECRET_KEY = os.getenv("SECRET_KEY", "").strip()
-if not SECRET_KEY:
-    SECRET_KEY = secrets.token_urlsafe(48)
+load_dotenv()
+
+CONFIGURED_SECRET_KEY = os.getenv("SECRET_KEY", "").strip()
+SECRET_KEY = CONFIGURED_SECRET_KEY or secrets.token_urlsafe(48)
+if not CONFIGURED_SECRET_KEY:
     warnings.warn(
-        "SECRET_KEY is not configured; using an ephemeral key. "
-        "Set SECRET_KEY in Render to keep admin sessions valid across restarts.",
+        "SECRET_KEY is not configured. Public routes remain available, but admin authentication is disabled.",
         RuntimeWarning,
         stacklevel=1,
     )
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_HOURS = int(os.getenv("ACCESS_TOKEN_HOURS", "8"))
-FALLBACK_ADMIN_USERNAME = "srinivasulu@srinivascanvassing.com"
-FALLBACK_ADMIN_PASSWORD_ROUNDS = 600_000
-FALLBACK_ADMIN_PASSWORD_SALT = bytes.fromhex("5ee1f3848467a4b6bfd0df62f219e7b4")
-FALLBACK_ADMIN_PASSWORD_HASH = "34a5a9efb6717b6ea9e1c7378557c53dad4770fc5fc9be1273b95d479a780db1"
-DEMO_LEAD_REQUEST_IDS = {
-    "RFQ-2026-A1B2",
-    "RFQ-2026-C3D4",
-    "RFQ-2026-E5F6",
-    "RFQ-2026-G7H8",
-}
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip().lower()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+ADMIN_PASSWORD_MIN_LENGTH = int(os.getenv("ADMIN_PASSWORD_MIN_LENGTH", "1"))
+ADMIN_COOKIE_NAME = os.getenv("ADMIN_COOKIE_NAME", "ssc_admin_session").strip() or "ssc_admin_session"
+ADMIN_COOKIE_SECURE = os.getenv("ADMIN_COOKIE_SECURE", "true").strip().lower() != "false"
+LOGIN_MAX_ATTEMPTS = int(os.getenv("LOGIN_MAX_ATTEMPTS", "5"))
+LOGIN_WINDOW_MINUTES = int(os.getenv("LOGIN_WINDOW_MINUTES", "15"))
+LOGIN_LOCKOUT_MINUTES = int(os.getenv("LOGIN_LOCKOUT_MINUTES", "15"))
+MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_BYTES", str(5 * 1024 * 1024)))
+SITE_URL = os.getenv("SITE_URL", "https://www.srinivascanvassing.com").rstrip("/")
+TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY", "").strip()
+IS_PRODUCTION = os.getenv("ENVIRONMENT", "").strip().lower() == "production" or os.getenv("RENDER", "").strip().lower() == "true"
+TURNSTILE_REQUIRED = os.getenv("TURNSTILE_REQUIRED", "true" if IS_PRODUCTION else "false").strip().lower() == "true"
+CONTACT_MAX_SUBMISSIONS = int(os.getenv("CONTACT_MAX_SUBMISSIONS", "5"))
+CONTACT_WINDOW_MINUTES = int(os.getenv("CONTACT_WINDOW_MINUTES", "15"))
+ALLOW_LOCAL_UPLOADS = os.getenv("ALLOW_LOCAL_UPLOADS", "false" if IS_PRODUCTION else "true").strip().lower() == "true"
 
 ALLOWED_RATE_UNITS = {
     "MT",
@@ -67,17 +78,152 @@ def validate_rate_unit(value: Optional[str]) -> str:
     return unit
 
 
-def verify_fallback_admin_password(password: str) -> bool:
-    candidate_hash = hashlib.pbkdf2_hmac(
-        "sha256",
-        password.encode("utf-8"),
-        FALLBACK_ADMIN_PASSWORD_SALT,
-        FALLBACK_ADMIN_PASSWORD_ROUNDS,
-    ).hex()
-    return hmac.compare_digest(candidate_hash, FALLBACK_ADMIN_PASSWORD_HASH)
+def utc_now() -> datetime.datetime:
+    return datetime.datetime.now(datetime.timezone.utc)
+
+
+def iso_utc(value: Optional[datetime.datetime] = None) -> str:
+    return (value or utc_now()).isoformat()
+
+
+def admin_configuration_error() -> Optional[str]:
+    if not CONFIGURED_SECRET_KEY:
+        return "SECRET_KEY must be configured in the Render backend environment"
+    if not ADMIN_USERNAME or not ADMIN_PASSWORD:
+        return "ADMIN_USERNAME and ADMIN_PASSWORD must be configured in the Render backend environment"
+    if len(ADMIN_PASSWORD) < ADMIN_PASSWORD_MIN_LENGTH:
+        return f"ADMIN_PASSWORD must contain at least {ADMIN_PASSWORD_MIN_LENGTH} characters"
+    return None
+
+
+def client_ip_fingerprint(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    address = forwarded.split(",", 1)[0].strip() if forwarded else ""
+    if not address and request.client:
+        address = request.client.host
+    return hashlib.sha256(f"{SECRET_KEY}:{address or 'unknown'}".encode("utf-8")).hexdigest()[:24]
+
+
+def safe_user_agent(request: Request) -> str:
+    return request.headers.get("user-agent", "unknown")[:300]
+
+
+def validate_contact_form(form_data: "ContactForm") -> None:
+    """Reject malformed or excessively large public form submissions before storage."""
+    fields = {
+        "Name": (form_data.name, 120),
+        "Company name": (form_data.company, 160),
+        "Email": (form_data.email, 254),
+        "Rice variety": (form_data.product_name, 160),
+        "Packaging": (form_data.packaging_type, 100),
+        "Requirement details": (form_data.inquiry, 2_000),
+        "Source page": (form_data.source_page, 64),
+        "Submission reference": (form_data.client_submission_id, 80),
+    }
+    for label, (value, maximum) in fields.items():
+        if value is not None and len(value.strip()) > maximum:
+            raise HTTPException(status_code=400, detail=f"{label} must be {maximum} characters or fewer")
+
+    if len(form_data.name.strip()) < 2 or len(form_data.company.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Enter a valid name and company name")
+    if form_data.email and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", form_data.email.strip()):
+        raise HTTPException(status_code=400, detail="Enter a valid business email address")
+    if form_data.quantity_mt is not None and not 0 < form_data.quantity_mt <= 100_000:
+        raise HTTPException(status_code=400, detail="Enter a quantity between 1 and 100,000")
+
+
+def contact_rate_limit_exceeded(db: Session, request: Request) -> bool:
+    cutoff = iso_utc(utc_now() - datetime.timedelta(minutes=CONTACT_WINDOW_MINUTES))
+    recent_count = db.query(Lead).filter(
+        Lead.ip_fingerprint == client_ip_fingerprint(request),
+        Lead.created_at >= cutoff,
+    ).count()
+    return recent_count >= CONTACT_MAX_SUBMISSIONS
+
+
+def public_product(product: RicePrice) -> dict:
+    """Return only fields intended for public website visitors and crawlers."""
+    return {
+        "id": product.id,
+        "variety_name": product.variety_name,
+        "slug": product.slug,
+        "status": "published",
+        "grade": product.grade,
+        "current_price_mt": product.current_price_mt,
+        "previous_price_mt": product.previous_price_mt,
+        "percentage_change": product.percentage_change,
+        "trend": product.trend,
+        "currency": product.currency,
+        "unit": product.unit,
+        "price_basis": product.price_basis,
+        "market_location": product.market_location,
+        "public_note": product.public_note,
+        "last_updated": product.last_updated,
+        "image_url": product.image_url,
+        "moisture": product.moisture,
+        "processing": product.processing,
+    }
+
+
+def record_login_event(
+    db: Session,
+    *,
+    username: str,
+    outcome: str,
+    reason: str,
+    request: Request,
+) -> None:
+    db.add(AdminLoginHistory(
+        username=username[:255] or "unknown",
+        outcome=outcome,
+        reason=reason[:255],
+        ip_fingerprint=client_ip_fingerprint(request),
+        user_agent=safe_user_agent(request),
+        created_at=iso_utc(),
+    ))
+    db.commit()
+
+
+def login_is_locked(db: Session, username: str, request: Request) -> bool:
+    cutoff = iso_utc(utc_now() - datetime.timedelta(minutes=LOGIN_WINDOW_MINUTES))
+    fingerprint = client_ip_fingerprint(request)
+    recent_failures = db.query(AdminLoginHistory).filter(
+        AdminLoginHistory.outcome == "failure",
+        AdminLoginHistory.created_at >= cutoff,
+        (AdminLoginHistory.username == username) | (AdminLoginHistory.ip_fingerprint == fingerprint),
+    ).order_by(AdminLoginHistory.created_at.desc()).all()
+    if len(recent_failures) < LOGIN_MAX_ATTEMPTS:
+        return False
+
+    latest_success = db.query(AdminLoginHistory).filter(
+        AdminLoginHistory.outcome == "success",
+        AdminLoginHistory.username == username,
+        AdminLoginHistory.created_at >= cutoff,
+    ).first()
+    if latest_success is not None:
+        return False
+
+    try:
+        latest_failure_at = datetime.datetime.fromisoformat(recent_failures[0].created_at)
+        if latest_failure_at.tzinfo is None:
+            latest_failure_at = latest_failure_at.replace(tzinfo=datetime.timezone.utc)
+    except (TypeError, ValueError):
+        return True
+    return latest_failure_at + datetime.timedelta(minutes=LOGIN_LOCKOUT_MINUTES) > utc_now()
+
+
+def decode_admin_token(token: str) -> dict:
+    try:
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.PyJWTError as error:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate admin session",
+        ) from error
+
 
 # Security scheme
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/admin/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/admin/login", auto_error=False)
 
 # Cloudinary is optional. Local fallback storage remains available when it is not configured.
 CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()
@@ -93,8 +239,6 @@ if CLOUDINARY_ENABLED:
         secure=True,
     )
 
-import re
-
 def slugify(text_val: str) -> str:
     text_val = text_val.lower()
     text_val = re.sub(r'[^a-z0-9]+', '-', text_val)
@@ -108,54 +252,8 @@ def init_db():
     db = SessionLocal()
     
     try:
-        try:
-            rice_count = db.query(RicePrice).count()
-        except Exception:
-            db.rollback()
-            rice_count = 0
-
-        seed_data = [
-            ("Sona Masuri Steam(BPT)", 5500.0, 5450.0, 0.92, "up"),
-            ("Sona Masuri Raw(BPT)", 5600.0, 5550.0, 0.90, "up"),
-            ("lachikari raw rice(JSR)", 7900.0, 7850.0, 0.64, "up"),
-            ("RNR Steam", 5950.0, 5900.0, 0.85, "up"),
-            ("Jsr Steem Rice", 6470.0, 6400.0, 1.09, "up"),
-        ]
-        
-        current_time = datetime.datetime.now().isoformat()
-        existing_products = {p.variety_name: p for p in db.query(RicePrice).all()}
-        
-        db_changed = False
-        # Preserve all existing products; seed data only adds missing rows or refreshes matching rows.
-        for item in seed_data:
-            name, curr_price, prev_price, change, trend = item
-            if name in existing_products:
-                prod = existing_products[name]
-                if prod.current_price_mt != curr_price:
-                    prod.current_price_mt = curr_price
-                    prod.previous_price_mt = prev_price
-                    prod.percentage_change = change
-                    prod.trend = trend
-                    prod.last_updated = current_time
-                    db_changed = True
-            else:
-                new_rice = RicePrice(
-                    variety_name=name,
-                    slug=slugify(name),
-                    current_price_mt=curr_price,
-                    previous_price_mt=prev_price,
-                    percentage_change=change,
-                    trend=trend,
-                    last_updated=current_time,
-                    status="published"
-                )
-                db.add(new_rice)
-                db_changed = True
-                
-        if db_changed:
-            db.commit()
-
-        # Ensure all existing products have a slug
+        # Never seed or overwrite production inventory. Migrations preserve genuine rows;
+        # this compatibility pass only fills a missing slug on an existing product.
         existing = db.query(RicePrice).all()
         updated = False
         for item in existing:
@@ -171,11 +269,19 @@ def init_db():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Run at startup
+    if IS_PRODUCTION and not os.getenv("DATABASE_URL", "").strip():
+        raise RuntimeError("DATABASE_URL must be configured in the Render backend environment")
     init_db()
     yield
     # Run at shutdown
 
-app = FastAPI(title="Sri Srinivasa Canvassing API", lifespan=lifespan)
+app = FastAPI(
+    title="Sri Srinivasa Canvassing API",
+    lifespan=lifespan,
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
+)
 
 # Configure Static file serving for uploads
 os.makedirs("uploads", exist_ok=True)
@@ -183,10 +289,11 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Configure CORS for local React development and Production
 origins = [
-    "http://localhost:5173", # Local dev default
     "https://www.srinivascanvassing.com", # Production domain
     "https://srinivascanvassing.com",
 ]
+if not IS_PRODUCTION:
+    origins.append("http://localhost:5173")
 
 # Add production URL if provided via environment
 frontend_url = os.getenv("FRONTEND_URL")
@@ -195,35 +302,68 @@ if frontend_url:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=os.getenv("FRONTEND_URL_REGEX", r"https://.*\.srinivascanvassing\.com|https://.*\.vercel\.app|http://localhost:5173"),
+    allow_origin_regex=os.getenv("FRONTEND_URL_REGEX", "").strip() or (None if IS_PRODUCTION else r"https://.*\.srinivascanvassing\.com|https://.*\.vercel\.app|http://localhost:5173"),
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- Dependencies & Auth ---
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        configured_user = os.getenv("ADMIN_USERNAME", "").strip().lower()
-        configured_password = os.getenv("ADMIN_PASSWORD", "")
-        if bool(configured_user) != bool(configured_password):
-            raise credentials_exception
-        expected_user = configured_user or FALLBACK_ADMIN_USERNAME
-        if not username or not isinstance(username, str) or username.lower() != expected_user:
-            raise credentials_exception
-        return username
-    except jwt.PyJWTError:
-        raise credentials_exception
 
-from models import RateAuditLog
+@app.middleware("http")
+async def apply_api_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if request.url.path.startswith(("/api/admin", "/api/leads", "/api/contact")):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+# --- Dependencies & Auth ---
+async def get_current_session(
+    request: Request,
+    bearer_token: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> AdminSession:
+    if admin_configuration_error():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Admin authentication is not configured securely",
+        )
+
+    token = request.cookies.get(ADMIN_COOKIE_NAME) or bearer_token
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin session required")
+
+    payload = decode_admin_token(token)
+    username = payload.get("sub")
+    session_id = payload.get("jti")
+    if not isinstance(username, str) or not isinstance(session_id, str):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin session")
+    if not hmac.compare_digest(username.lower(), ADMIN_USERNAME):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin session")
+
+    session = db.query(AdminSession).filter(AdminSession.session_id == session_id).first()
+    if not session or session.revoked_at:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin session has been revoked")
+
+    try:
+        expires_at = datetime.datetime.fromisoformat(session.expires_at)
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=datetime.timezone.utc)
+    except (TypeError, ValueError) as error:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin session") from error
+    if expires_at <= utc_now():
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin session has expired")
+
+    session.last_seen_at = iso_utc()
+    db.commit()
+    return session
+
+
+async def get_current_user(session: AdminSession = Depends(get_current_session)) -> str:
+    return session.username
 
 # --- Models ---
 class ContactForm(BaseModel):
@@ -236,10 +376,15 @@ class ContactForm(BaseModel):
     destination_port: Optional[str] = None
     product_name: Optional[str] = None
     quantity_mt: Optional[float] = None
+    quantity_unit: Optional[str] = "MT"
     packaging_type: Optional[str] = None
     incoterm: Optional[str] = None
+    privacy_consent: bool = False
+    marketing_consent: bool = False
+    turnstile_token: Optional[str] = None
     honeypot: Optional[str] = None # Anti-spam trap field
     source_page: Optional[str] = "contact"
+    client_submission_id: Optional[str] = None
 
 class ProductAdd(BaseModel):
     name: str
@@ -265,90 +410,302 @@ class ProductUpdate(BaseModel):
 # --- Routes ---
 
 @app.post("/api/admin/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(
+    request: Request,
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
     username = form_data.username.strip().lower()
     password = form_data.password.strip()
-    
-    expected_user = os.getenv("ADMIN_USERNAME", "").strip().lower()
-    expected_pass = os.getenv("ADMIN_PASSWORD", "")
 
-    if bool(expected_user) != bool(expected_pass):
+    configuration_error = admin_configuration_error()
+    if configuration_error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="ADMIN_USERNAME and ADMIN_PASSWORD must be configured together",
+            detail=configuration_error,
         )
 
-    if expected_user and expected_pass:
-        credentials_valid = (
-            hmac.compare_digest(username, expected_user)
-            and hmac.compare_digest(password, expected_pass)
+    if login_is_locked(db, username, request):
+        record_login_event(
+            db,
+            username=username,
+            outcome="blocked",
+            reason="Temporary lockout after repeated failed sign-in attempts",
+            request=request,
         )
-    else:
-        expected_user = FALLBACK_ADMIN_USERNAME
-        credentials_valid = (
-            hmac.compare_digest(username, expected_user)
-            and verify_fallback_admin_password(password)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many failed sign-in attempts. Try again in {LOGIN_LOCKOUT_MINUTES} minutes.",
+            headers={"Retry-After": str(LOGIN_LOCKOUT_MINUTES * 60)},
         )
+
+    credentials_valid = (
+        hmac.compare_digest(username, ADMIN_USERNAME)
+        and hmac.compare_digest(password, ADMIN_PASSWORD)
+    )
 
     if credentials_valid:
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = utc_now()
+        expires_at = now + datetime.timedelta(hours=ACCESS_TOKEN_HOURS)
+        session_id = secrets.token_urlsafe(32)
         access_token = jwt.encode(
             {
-                "sub": expected_user,
+                "sub": ADMIN_USERNAME,
+                "jti": session_id,
                 "iat": now,
-                "exp": now + datetime.timedelta(hours=ACCESS_TOKEN_HOURS),
+                "exp": expires_at,
             },
             SECRET_KEY,
             algorithm=ALGORITHM,
         )
-        return {"access_token": access_token, "token_type": "bearer"}
+        db.add(AdminSession(
+            session_id=session_id,
+            username=ADMIN_USERNAME,
+            issued_at=iso_utc(now),
+            expires_at=iso_utc(expires_at),
+            last_seen_at=iso_utc(now),
+            ip_fingerprint=client_ip_fingerprint(request),
+            user_agent=safe_user_agent(request),
+        ))
+        db.add(AdminLoginHistory(
+            username=ADMIN_USERNAME,
+            outcome="success",
+            reason="Authenticated",
+            ip_fingerprint=client_ip_fingerprint(request),
+            user_agent=safe_user_agent(request),
+            created_at=iso_utc(now),
+        ))
+        db.commit()
+        response.set_cookie(
+            key=ADMIN_COOKIE_NAME,
+            value=access_token,
+            max_age=ACCESS_TOKEN_HOURS * 60 * 60,
+            expires=ACCESS_TOKEN_HOURS * 60 * 60,
+            path="/",
+            secure=ADMIN_COOKIE_SECURE,
+            httponly=True,
+            samesite="strict",
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return {
+            "authenticated": True,
+            "username": ADMIN_USERNAME,
+            "expires_at": iso_utc(expires_at),
+        }
+
+    record_login_event(
+        db,
+        username=username,
+        outcome="failure",
+        reason="Incorrect username or password",
+        request=request,
+    )
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Incorrect username or password",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+
+@app.get("/api/admin/session")
+async def admin_session_status(session: AdminSession = Depends(get_current_session)):
+    return {
+        "authenticated": True,
+        "username": session.username,
+        "expires_at": session.expires_at,
+    }
+
+
+@app.post("/api/admin/logout")
+async def logout(
+    response: Response,
+    session: AdminSession = Depends(get_current_session),
+    db: Session = Depends(get_db),
+):
+    stored_session = db.query(AdminSession).filter(AdminSession.session_id == session.session_id).first()
+    if stored_session:
+        stored_session.revoked_at = iso_utc()
+    db.commit()
+    response.delete_cookie(
+        ADMIN_COOKIE_NAME,
+        path="/",
+        secure=ADMIN_COOKIE_SECURE,
+        httponly=True,
+        samesite="strict",
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return {"message": "Signed out successfully"}
+
+
+@app.get("/api/admin/sessions")
+async def list_admin_sessions(
+    current_session: AdminSession = Depends(get_current_session),
+    db: Session = Depends(get_db),
+):
+    sessions = db.query(AdminSession).order_by(AdminSession.id.desc()).limit(50).all()
+    return [{
+        "session_id": item.session_id,
+        "username": item.username,
+        "issued_at": item.issued_at,
+        "expires_at": item.expires_at,
+        "last_seen_at": item.last_seen_at,
+        "revoked_at": item.revoked_at,
+        "ip_fingerprint": item.ip_fingerprint,
+        "user_agent": item.user_agent,
+        "current": item.session_id == current_session.session_id,
+    } for item in sessions]
+
+
+@app.post("/api/admin/sessions/{session_id}/revoke")
+async def revoke_admin_session(
+    session_id: str,
+    _: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    session = db.query(AdminSession).filter(AdminSession.session_id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Admin session not found")
+    if not session.revoked_at:
+        session.revoked_at = iso_utc()
+        db.commit()
+    return {"message": "Admin session revoked"}
+
+
+@app.get("/api/admin/login-history")
+async def get_admin_login_history(
+    _: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    events = db.query(AdminLoginHistory).order_by(AdminLoginHistory.id.desc()).limit(100).all()
+    return events
+
 @app.get("/api/products")
 async def get_products(db: Session = Depends(get_db)):
-    """Alias for getting all products"""
-    products = db.query(RicePrice).order_by(RicePrice.id.asc()).all()
-    return products
+    products = db.query(RicePrice).filter(RicePrice.status == "published").order_by(RicePrice.id.asc()).all()
+    return [public_product(product) for product in products]
 
 @app.get("/api/products/slug/{slug}")
 async def get_product_by_slug(slug: str, db: Session = Depends(get_db)):
     norm_slug = slug.lower().strip()
-    product = db.query(RicePrice).filter(RicePrice.slug == norm_slug).first()
+    product = db.query(RicePrice).filter(
+        RicePrice.slug == norm_slug,
+        RicePrice.status == "published",
+    ).first()
     if not product:
-        all_prods = db.query(RicePrice).all()
+        all_prods = db.query(RicePrice).filter(RicePrice.status == "published").all()
         for p in all_prods:
             if slugify(p.variety_name) == norm_slug:
-                return p
+                return public_product(p)
         raise HTTPException(status_code=404, detail="Product variety not found")
-    return product
+    return public_product(product)
 
 # Keep /api/prices backward compatibility
 @app.get("/api/prices")
 async def get_prices(db: Session = Depends(get_db)):
     return await get_products(db)
 
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def dynamic_sitemap(db: Session = Depends(get_db)):
+    public_routes = [
+        ("/", "daily", "1.0"),
+        ("/about", "monthly", "0.8"),
+        ("/products", "daily", "0.9"),
+        ("/market-rates", "daily", "0.9"),
+        ("/packaging", "monthly", "0.7"),
+        ("/certifications", "monthly", "0.7"),
+        ("/contact", "monthly", "0.8"),
+        ("/legal", "yearly", "0.3"),
+    ]
+    entries = []
+    for path, frequency, priority in public_routes:
+        url = f"{SITE_URL}/" if path == "/" else f"{SITE_URL}{path}"
+        entries.append(
+            f"  <url><loc>{xml_escape(url)}</loc><changefreq>{frequency}</changefreq><priority>{priority}</priority></url>"
+        )
+
+    products = db.query(RicePrice).filter(RicePrice.status == "published").order_by(RicePrice.id.asc()).all()
+    for product in products:
+        product_slug = product.slug or slugify(product.variety_name)
+        last_modified = (product.last_updated or "")[:10]
+        lastmod_element = f"<lastmod>{xml_escape(last_modified)}</lastmod>" if last_modified else ""
+        entries.append(
+            f"  <url><loc>{xml_escape(f'{SITE_URL}/products/{product_slug}')}</loc>{lastmod_element}<changefreq>weekly</changefreq><priority>0.8</priority></url>"
+        )
+
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    xml += "\n".join(entries)
+    xml += "\n</urlset>\n"
+    return FastAPIResponse(
+        content=xml,
+        media_type="application/xml",
+        headers={"Cache-Control": "public, max-age=300, s-maxage=300"},
+    )
+
+def detect_image_extension(content: bytes) -> Optional[str]:
+    if content.startswith(b"\xff\xd8\xff"):
+        return "jpg"
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if content.startswith(b"RIFF") and content[8:12] == b"WEBP":
+        return "webp"
+    if len(content) >= 12 and content[4:8] == b"ftyp" and content[8:12] in {b"avif", b"avis"}:
+        return "avif"
+    return None
+
+
+async def validated_image_bytes(image: UploadFile) -> tuple[bytes, str]:
+    declared_type = (image.content_type or "").lower()
+    allowed_types = {"image/jpeg", "image/png", "image/webp", "image/avif"}
+    if declared_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Upload a JPEG, PNG, WebP, or AVIF image",
+        )
+
+    await image.seek(0)
+    content = await image.read(MAX_IMAGE_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded image is empty")
+    if len(content) > MAX_IMAGE_BYTES:
+        max_megabytes = MAX_IMAGE_BYTES / (1024 * 1024)
+        raise HTTPException(status_code=413, detail=f"Image must be {max_megabytes:g} MB or smaller")
+
+    extension = detect_image_extension(content)
+    if not extension:
+        raise HTTPException(status_code=415, detail="The uploaded file content is not a supported image")
+    return content, extension
+
+
 async def save_image_file(image: UploadFile) -> Optional[str]:
+    content, extension = await validated_image_bytes(image)
+
     # Primary: Upload to Cloudinary
     if CLOUDINARY_ENABLED:
         try:
-            image.file.seek(0)
-            upload_result = cloudinary.uploader.upload(image.file, folder="rice_products")
+            upload_result = cloudinary.uploader.upload(
+                io.BytesIO(content),
+                folder="rice_products",
+                resource_type="image",
+                format=extension,
+            )
             if upload_result and upload_result.get("secure_url"):
                 return upload_result.get("secure_url")
         except Exception as e:
             print(f"Cloudinary upload note: {e}")
 
-    # Fallback: Save to local uploads directory
+    if not ALLOW_LOCAL_UPLOADS:
+        raise HTTPException(
+            status_code=503,
+            detail="Image storage is not configured. Please try again later.",
+        )
+
+    # Local files are intended only for development. Render files are not durable.
     try:
         os.makedirs("uploads", exist_ok=True)
-        filename = f"{secrets.token_hex(6)}_{image.filename}"
+        filename = f"{secrets.token_hex(16)}.{extension}"
         file_path = os.path.join("uploads", filename)
-        image.file.seek(0)
-        content = await image.read()
         with open(file_path, "wb") as f:
             f.write(content)
         return f"/uploads/{filename}"
@@ -561,8 +918,43 @@ async def delete_product(
     db.commit()
     return {"message": "Variety soft archived successfully"}
 
+
+async def verify_turnstile(token: Optional[str], request: Request) -> None:
+    if not TURNSTILE_SECRET_KEY:
+        if TURNSTILE_REQUIRED:
+            raise HTTPException(
+                status_code=503,
+                detail="Anti-spam verification is not configured. Please contact us by WhatsApp.",
+            )
+        return
+    if not token:
+        raise HTTPException(status_code=400, detail="Please complete the anti-spam verification")
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            result = await client.post(
+                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                data={
+                    "secret": TURNSTILE_SECRET_KEY,
+                    "response": token,
+                    "remoteip": request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip(),
+                },
+            )
+            result.raise_for_status()
+            verification = result.json()
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Anti-spam verification is temporarily unavailable") from error
+
+    if not verification.get("success"):
+        raise HTTPException(status_code=400, detail="Anti-spam verification failed. Please try again")
+
+
 @app.post("/api/contact")
-async def handle_contact(form_data: ContactForm, db: Session = Depends(get_db)):
+async def handle_contact(
+    form_data: ContactForm,
+    request: Request,
+    db: Session = Depends(get_db),
+):
     # Anti-spam Honeypot Check
     if form_data.honeypot and len(form_data.honeypot.strip()) > 0:
         # Silent rejection for bot submissions
@@ -571,6 +963,36 @@ async def handle_contact(form_data: ContactForm, db: Session = Depends(get_db)):
             "request_id": "RFQ-BOT-FILTERED",
             "notification_status": "filtered"
         }
+
+    if not form_data.privacy_consent:
+        raise HTTPException(status_code=400, detail="Privacy consent is required to submit an enquiry")
+
+    validate_contact_form(form_data)
+
+    if contact_rate_limit_exceeded(db, request):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many enquiries were submitted from this connection. Please wait a few minutes or contact us by WhatsApp.",
+            headers={"Retry-After": str(CONTACT_WINDOW_MINUTES * 60)},
+        )
+
+    client_submission_id = (form_data.client_submission_id or "").strip()
+    if client_submission_id:
+        existing_lead = db.query(Lead).filter(Lead.client_submission_id == client_submission_id).first()
+        if existing_lead:
+            return {
+                "message": "Inquiry already received successfully.",
+                "request_id": existing_lead.request_id,
+                "notification_status": existing_lead.notification_status,
+                "confirmation_status": existing_lead.confirmation_status,
+            }
+
+    normalized_whatsapp = form_data.whatsapp.strip().replace(" ", "").replace("-", "")
+    if not re.fullmatch(r"\+?[1-9]\d{6,14}", normalized_whatsapp):
+        raise HTTPException(status_code=400, detail="Enter a valid WhatsApp number including country code")
+
+    quantity_unit = validate_rate_unit(form_data.quantity_unit)
+    await verify_turnstile(form_data.turnstile_token, request)
 
     request_id = f"RFQ-{datetime.datetime.now().year}-{secrets.token_hex(3).upper()}"
     try:
@@ -581,11 +1003,12 @@ async def handle_contact(form_data: ContactForm, db: Session = Depends(get_db)):
             name=form_data.name.strip(),
             company=form_data.company.strip(),
             email=form_data.email.strip() if form_data.email else None,
-            whatsapp=form_data.whatsapp.strip(),
+            whatsapp=normalized_whatsapp,
             destination_country=form_data.destination_country,
             destination_port=form_data.destination_port,
             product_name=form_data.product_name,
             quantity_mt=form_data.quantity_mt,
+            quantity_unit=quantity_unit,
             packaging_type=form_data.packaging_type,
             incoterm=form_data.incoterm,
             inquiry_text=form_data.inquiry.strip(),
@@ -593,6 +1016,13 @@ async def handle_contact(form_data: ContactForm, db: Session = Depends(get_db)):
             source_page=source_page,
             notification_status="pending",
             notification_channel="webhook",
+            privacy_consent=True,
+            marketing_consent=form_data.marketing_consent,
+            consent_at=iso_utc(),
+            confirmation_status="pending",
+            confirmation_channel="none",
+            client_submission_id=client_submission_id or None,
+            ip_fingerprint=client_ip_fingerprint(request),
             created_at=datetime.datetime.now().isoformat()
         )
         db.add(new_lead)
@@ -618,6 +1048,8 @@ async def handle_contact(form_data: ContactForm, db: Session = Depends(get_db)):
                             "whatsapp": new_lead.whatsapp,
                             "product_name": new_lead.product_name,
                             "quantity_mt": new_lead.quantity_mt,
+                            "quantity_unit": new_lead.quantity_unit,
+                            "marketing_consent": new_lead.marketing_consent,
                             "created_at": new_lead.created_at,
                         },
                     )
@@ -629,11 +1061,43 @@ async def handle_contact(form_data: ContactForm, db: Session = Depends(get_db)):
                 new_lead.notification_status = "failed"
                 new_lead.notification_error = str(notification_error)[:500]
 
+        confirmation_webhook_url = os.getenv("CUSTOMER_CONFIRMATION_WEBHOOK_URL", "").strip()
+        if not confirmation_webhook_url:
+            new_lead.confirmation_status = "not_configured"
+            new_lead.confirmation_channel = "none"
+        else:
+            new_lead.confirmation_attempted_at = iso_utc()
+            new_lead.confirmation_channel = "webhook"
+            try:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    confirmation_response = await client.post(
+                        confirmation_webhook_url,
+                        json={
+                            "event": "quote_reference_confirmation",
+                            "request_id": request_id,
+                            "name": new_lead.name,
+                            "email": new_lead.email,
+                            "whatsapp": new_lead.whatsapp,
+                            "product_name": new_lead.product_name,
+                            "quantity": new_lead.quantity_mt,
+                            "quantity_unit": new_lead.quantity_unit,
+                            "message": f"Your Sri Srinivasa Canvassing enquiry reference is {request_id}.",
+                        },
+                    )
+                    confirmation_response.raise_for_status()
+                new_lead.confirmation_status = "delivered"
+                new_lead.confirmation_delivered_at = iso_utc()
+                new_lead.confirmation_error = None
+            except Exception as confirmation_error:
+                new_lead.confirmation_status = "failed"
+                new_lead.confirmation_error = str(confirmation_error)[:500]
+
         db.commit()
         return {
             "message": "Inquiry received successfully. Our team will contact you shortly via WhatsApp.",
             "request_id": request_id,
-            "notification_status": new_lead.notification_status
+            "notification_status": new_lead.notification_status,
+            "confirmation_status": new_lead.confirmation_status,
         }
     except Exception as e:
         db.rollback()
@@ -646,7 +1110,8 @@ async def get_leads(
     db: Session = Depends(get_db)
 ):
     leads = db.query(Lead).order_by(Lead.id.desc()).all()
-    return [lead for lead in leads if lead.request_id not in DEMO_LEAD_REQUEST_IDS]
+    # Preserve and return every genuine record. No demo identifiers are filtered here.
+    return leads
 
 @app.get("/api/rate-audit-logs")
 async def get_rate_audit_logs(

@@ -8,6 +8,7 @@ import { OptimizedImage } from '../components/OptimizedImage';
 import { API_BASE_URL } from '../config/api';
 import { PRODUCT_CATALOG } from '../data/productCatalog';
 import { getRateUnitShortLabel } from '../utils/rateUnits';
+import { trackEvent } from '../utils/analytics';
 
 const Products = () => {
     const [products, setProducts] = useState(PRODUCT_CATALOG);
@@ -109,6 +110,7 @@ const Products = () => {
                                             </Link>
                                             <Link 
                                                 to={`/contact?product=${encodeURIComponent(product.variety_name)}`} 
+                                                onClick={() => trackEvent('product_quote_click', { source_page: 'products', product_requested: product.variety_name })}
                                                 className="w-full py-2.5 px-3 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold text-xs text-center flex items-center justify-center gap-1 transition-all"
                                             >
                                                 Quote <ArrowRight className="w-3.5 h-3.5" />

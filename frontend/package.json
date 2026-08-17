@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:client && npm run build:ssr && node scripts/prerender.mjs",
+    "build": "npm run build:products && npm run build:client && npm run build:ssr && node scripts/prerender.mjs",
+    "build:products": "node scripts/generate-product-catalog.mjs",
     "build:client": "vite build",
     "build:ssr": "vite build --ssr src/entry-server.jsx --outDir dist-ssr",
     "lint": "eslint .",

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useMeta from '../hooks/useMeta';
-import { API_BASE_URL } from '../config/api';
+import { adminFetch } from '../utils/adminApi';
 
 const AdminLogin = () => {
     useMeta({
@@ -25,18 +25,17 @@ const AdminLogin = () => {
             const formData = new URLSearchParams();
             formData.append('username', username);
             formData.append('password', password);
-            const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
+            const response = await adminFetch('/api/admin/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData.toString()
             });
             if (response.ok) {
-                const data = await response.json();
-                localStorage.setItem('admin_token', data.access_token);
                 toast.success('Sign-in successful!');
                 navigate('/admin');
             } else {
-                toast.error('Invalid username or password credentials');
+                const data = await response.json().catch(() => ({}));
+                toast.error(data.detail || 'Invalid username or password credentials');
             }
         } catch {
             toast.error('Unable to connect to administrative server');

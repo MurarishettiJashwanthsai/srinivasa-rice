@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import Integer, String, Float, Text
+from sqlalchemy import Boolean, Integer, String, Float, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from database import Base
 
@@ -56,6 +56,7 @@ class Lead(Base):
     destination_port: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     product_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     quantity_mt: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    quantity_unit: Mapped[Optional[str]] = mapped_column(String, default="MT", nullable=True)
     packaging_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     incoterm: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     inquiry_text: Mapped[str] = mapped_column(String, nullable=False)
@@ -66,5 +67,40 @@ class Lead(Base):
     notification_attempted_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     notification_delivered_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     notification_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    privacy_consent: Mapped[Optional[bool]] = mapped_column(Boolean, default=False, nullable=True)
+    marketing_consent: Mapped[Optional[bool]] = mapped_column(Boolean, default=False, nullable=True)
+    consent_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    confirmation_status: Mapped[Optional[str]] = mapped_column(String, default="pending", nullable=True)
+    confirmation_channel: Mapped[Optional[str]] = mapped_column(String, default="none", nullable=True)
+    confirmation_attempted_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    confirmation_delivered_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    confirmation_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    client_submission_id: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)
+    ip_fingerprint: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)
     created_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
+
+class AdminSession(Base):
+    __tablename__ = "admin_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    session_id: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    username: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    issued_at: Mapped[str] = mapped_column(String, nullable=False)
+    expires_at: Mapped[str] = mapped_column(String, nullable=False)
+    last_seen_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    revoked_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    ip_fingerprint: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+
+class AdminLoginHistory(Base):
+    __tablename__ = "admin_login_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    username: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    outcome: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    ip_fingerprint: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, index=True, nullable=False)

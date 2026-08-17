@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Globe2, ShieldCheck, Box, MessageCircle, Send, TrendingUp, Truck, Users, Wheat, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -9,6 +9,9 @@ import { countries } from '../data/countries';
 import { API_BASE_URL } from '../config/api';
 import { PRODUCT_CATALOG } from '../data/productCatalog';
 import { getRateUnitShortLabel } from '../utils/rateUnits';
+import { trackEvent } from '../utils/analytics';
+import TurnstileWidget from '../components/TurnstileWidget';
+import { validateNationalPhoneNumber } from '../utils/phoneValidation';
 
 const Home = () => {
     const [name, setName] = useState('');
@@ -16,7 +19,10 @@ const Home = () => {
     const [countryCode, setCountryCode] = useState('+91');
     const [loading, setLoading] = useState(false);
     const [subscriptionReference, setSubscriptionReference] = useState('');
+    const [alertConsent, setAlertConsent] = useState(false);
+    const [turnstileToken, setTurnstileToken] = useState('');
     const [products, setProducts] = useState(PRODUCT_CATALOG);
+    const handleTurnstileToken = useCallback((token) => setTurnstileToken(token), []);
 
     useEffect(() => {
         const fetchProducts = async () => {
@@ -32,7 +38,13 @@ const Home = () => {
         e.preventDefault();
         setLoading(true);
         try {
-            const fullNumber = `${countryCode}${whatsapp}`;
+            const phoneValidation = validateNationalPhoneNumber(countryCode, whatsapp);
+            if (!phoneValidation.valid) {
+                toast.error(phoneValidation.message);
+                trackEvent('price_alert_form_failure', { source_page: 'price-alert', error_type: 'phone_validation' });
+                return;
+            }
+            const fullNumber = phoneValidation.fullNumber;
             const response = await fetch(`${API_BASE_URL}/api/contact`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -41,6 +53,9 @@ const Home = () => {
                     company: "Price Alert Subscriber", 
                     whatsapp: fullNumber, 
                     inquiry: `Subscribed to Daily WhatsApp Price Alerts (Country: ${countryCode})`,
+                    privacy_consent: alertConsent,
+                    marketing_consent: true,
+                    turnstile_token: turnstileToken || null,
                     source_page: 'price-alert'
                 })
             });
@@ -49,9 +64,7 @@ const Home = () => {
                 if (!data.request_id) throw new Error('Missing subscription reference');
                 setSubscriptionReference(data.request_id);
                 toast.success(`Subscribed successfully. Reference: ${data.request_id}`);
-                window.dataLayer = window.dataLayer || [];
-                window.dataLayer.push({
-                    event: 'price_alert_form_success',
+                trackEvent('price_alert_form_success', {
                     request_id: data.request_id,
                     notification_status: data.notification_status || 'unknown',
                     source_page: 'price-alert'
@@ -65,8 +78,14 @@ const Home = () => {
                 }));
                 setName('');
                 setWhatsapp('');
-            } else toast.error('Failed to subscribe. Please try again.');
-        } catch { toast.error('Network error. Please try again later.'); }
+            } else {
+                trackEvent('price_alert_form_failure', { source_page: 'price-alert', error_type: `http_${response.status}` });
+                toast.error('Failed to subscribe. Please try again.');
+            }
+        } catch {
+            trackEvent('price_alert_form_failure', { source_page: 'price-alert', error_type: 'network' });
+            toast.error('Network error. Please try again later.');
+        }
         finally { setLoading(false); }
     };
 
@@ -78,7 +97,7 @@ const Home = () => {
     ];
 
     const features = [
-        { icon: ShieldCheck, title: 'Certified Quality', desc: 'IEC & GST registered. Rigorous third-party inspections at every stage.' },
+        { icon: ShieldCheck, title: 'Documented Quality', desc: 'IEC & GST registered. Inspection and quality documents are arranged according to the final order requirements.' },
         { icon: Globe2, title: 'Worldwide Export', desc: 'Krishnapatnam & Chennai ports with efficient global logistics network.' },
         { icon: Box, title: 'Custom Packaging', desc: '26kg, 50kg PP bags and customizable bulk packaging for importers.' },
         { icon: Truck, title: 'Fast Logistics', desc: 'Strategic location with direct port connectivity for rapid shipments.' },
@@ -146,7 +165,8 @@ const Home = () => {
                         <h2 className="text-3xl md:text-5xl font-display font-black text-text-main mb-4 leading-tight uppercase">Daily Miryalaguda Market Rates</h2>
                         <p className="text-text-muted text-lg max-w-2xl mx-auto mb-10 font-bold">Receive the latest indicative market rates and availability updates directly to your WhatsApp.</p>
                         
-                        <form onSubmit={handleSubscribe} method="POST" className="max-w-4xl mx-auto flex flex-col lg:flex-row gap-3 justify-center items-stretch">
+                        <form onSubmit={handleSubscribe} method="POST" className="max-w-4xl mx-auto space-y-4">
+                            <div className="flex flex-col lg:flex-row gap-3 justify-center items-stretch">
                             <div className="text-left space-y-1 lg:w-48">
                                 <label htmlFor="alert-name" className="sr-only">Full Name</label>
                                 <input 
@@ -202,6 +222,12 @@ const Home = () => {
                             <button type="submit" disabled={loading} className="button-primary lg:w-48 shrink-0">
                                 {loading ? '...' : <><span>Get Alerts</span><Send className="w-4 h-4" /></>}
                             </button>
+                            </div>
+                            <label className="flex items-start justify-center gap-2 text-left text-xs font-bold text-text-muted">
+                                <input type="checkbox" required checked={alertConsent} onChange={(event) => setAlertConsent(event.target.checked)} className="mt-0.5" />
+                                <span>I agree to the <Link to="/legal#privacy-policy" className="text-primary underline">Privacy Policy</Link> and request WhatsApp market-rate updates. I can opt out at any time.</span>
+                            </label>
+                            <div className="flex justify-center"><TurnstileWidget onToken={handleTurnstileToken} /></div>
                         </form>
                         {subscriptionReference && (
                             <p className="mt-4 text-sm font-bold text-primary" role="status" aria-live="polite">

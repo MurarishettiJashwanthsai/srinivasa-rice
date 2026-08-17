@@ -1,4 +1,6 @@
-const CATALOG_PRODUCTS = [
+import { GENERATED_PRODUCT_CATALOG } from './generatedProductCatalog';
+
+const FALLBACK_CATALOG_PRODUCTS = [
     {
         id: 'catalog-sona-masuri-steam-bpt',
         slug: 'sona-masuri-steam-bpt',
@@ -65,6 +67,10 @@ const CATALOG_PRODUCTS = [
         image_url: 'https://images.unsplash.com/photo-1569470984168-3069c9b5fdef?auto=format&fit=crop&q=80&w=800',
     },
 ];
+
+const CATALOG_PRODUCTS = GENERATED_PRODUCT_CATALOG.length > 0
+    ? GENERATED_PRODUCT_CATALOG
+    : FALLBACK_CATALOG_PRODUCTS;
 
 export const PRODUCT_CATALOG = Object.freeze(CATALOG_PRODUCTS.map((product) => Object.freeze(product)));
 

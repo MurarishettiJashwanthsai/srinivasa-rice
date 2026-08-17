@@ -6,6 +6,9 @@ import { OptimizedImage } from '../components/OptimizedImage';
 import { API_BASE_URL } from '../config/api';
 import { getCatalogProduct, slugifyProductName } from '../data/productCatalog';
 import { getRateUnitShortLabel } from '../utils/rateUnits';
+import { trackEvent } from '../utils/analytics';
+import useMeta from '../hooks/useMeta';
+import { SITE_URL } from '../seo/siteSeo';
 
 const ProductDetail = () => {
     const { slug } = useParams();
@@ -13,6 +16,18 @@ const ProductDetail = () => {
     const [product, setProduct] = useState(catalogProduct);
     const [loading, setLoading] = useState(!catalogProduct);
     const [error, setError] = useState(false);
+    const canonicalSlug = product?.slug || slug;
+
+    useMeta({
+        title: product ? `${product.variety_name} Specifications and Bulk Quote` : 'Rice Variety Specifications',
+        description: product
+            ? `View ${product.variety_name} processing, moisture, indicative Miryalaguda rate information and request a verified bulk quotation.`
+            : 'View rice processing and moisture specifications and request a verified bulk quotation.',
+        canonical: `${SITE_URL}/products/${canonicalSlug}`,
+        robots: product ? 'index, follow' : 'noindex, follow',
+        ogType: 'product',
+        ogImage: product?.image_url,
+    });
 
     useEffect(() => {
         const fetchProduct = async () => {
@@ -105,6 +120,21 @@ const ProductDetail = () => {
     }
 
     const varietyName = product?.variety_name || 'Rice Variety';
+    const dynamicStructuredData = !catalogProduct ? {
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        '@id': `${SITE_URL}/products/${canonicalSlug}#product`,
+        url: `${SITE_URL}/products/${canonicalSlug}`,
+        name: varietyName,
+        image: product?.image_url ? [product.image_url] : undefined,
+        category: 'Rice',
+        description: `Bulk ${varietyName} sourced through Sri Srinivasa Canvassing in Miryalaguda, Telangana.`,
+        additionalProperty: [
+            { '@type': 'PropertyValue', name: 'Processing', value: product?.processing || 'Contact for specification' },
+            { '@type': 'PropertyValue', name: 'Moisture', value: product?.moisture || 'Contact for specification' },
+            { '@type': 'PropertyValue', name: 'Origin', value: product?.market_location || 'Miryalaguda, Telangana, India' },
+        ],
+    } : null;
 
     const specs = [
         { label: 'Process Type', value: product?.processing || '100% Sortexed Steam / Raw' },
@@ -115,12 +145,15 @@ const ProductDetail = () => {
         { label: 'Origin', value: 'Miryalaguda, Telangana, India' },
         { label: 'Minimum Order Quantity', value: '25 Metric Tons (1 x 20ft Container)' },
         { label: 'Packaging Options', value: '26kg, 50kg PP Bags / Non-Woven / Jute' },
-        { label: 'Pre-shipment Inspection', value: 'SGS / Geo-Chem / Intertek COA' },
+        { label: 'Pre-shipment Inspection', value: 'Available by buyer agreement and final contract terms' },
         { label: 'Loading Ports', value: 'Krishnapatnam Port / Kakinada / Chennai' },
     ];
 
     return (
         <div className="bg-background py-10 md:py-16 min-h-screen font-sans">
+            {dynamicStructuredData && (
+                <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(dynamicStructuredData).replace(/</g, '\\u003c') }} />
+            )}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Navigation Breadcrumb */}
                 <motion.div {...fadeUp} className="mb-8">
@@ -181,6 +214,7 @@ const ProductDetail = () => {
 
                             <Link
                                 to={`/contact?product=${encodeURIComponent(varietyName)}`}
+                                onClick={() => trackEvent('product_quote_click', { source_page: 'product_detail', product_requested: varietyName })}
                                 className="button-primary !py-3.5 !px-6 text-sm whitespace-nowrap text-center"
                             >
                                 Request Proforma Quote
@@ -231,7 +265,7 @@ const ProductDetail = () => {
                     <p className="text-text-muted font-bold text-sm max-w-lg mx-auto mb-6">
                         Specify destination port, packaging requirement, and target tonnage to get an official proforma invoice.
                     </p>
-                    <Link to={`/contact?product=${encodeURIComponent(varietyName)}`} className="button-primary !py-4 !px-10 text-base">
+                    <Link to={`/contact?product=${encodeURIComponent(varietyName)}`} onClick={() => trackEvent('product_quote_click', { source_page: 'product_detail', product_requested: varietyName })} className="button-primary !py-4 !px-10 text-base">
                         Get Instant Quotation
                     </Link>
                 </motion.div>

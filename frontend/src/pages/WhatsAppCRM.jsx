@@ -6,6 +6,7 @@ import { MessageSquare, FileText, Megaphone, BarChart3, Search, Send, Tag, Phone
 import { API_BASE_URL } from '../config/api';
 import useInquiryNotifications from '../hooks/useInquiryNotifications';
 import { getRateUnitShortLabel } from '../utils/rateUnits';
+import { adminFetch } from '../utils/adminApi';
 
 const API = API_BASE_URL;
 
@@ -16,7 +17,6 @@ const WhatsAppCRM = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [broadcastMessage, setBroadcastMessage] = useState('');
     const navigate = useNavigate();
-    const token = localStorage.getItem('admin_token');
     const {
         browserNotificationPermission,
         clearUnreadInquiries,
@@ -41,19 +41,18 @@ const WhatsAppCRM = () => {
 
     const fetchLeads = useCallback(async () => {
         try {
-            const res = await fetch(`${API}/api/leads`, { headers: { Authorization: `Bearer ${token}` } });
+            const res = await adminFetch('/api/leads');
             if (res.ok) {
                 const data = await res.json();
                 processLeadUpdate(data);
                 setLeads(Array.isArray(data) ? data : []);
             } else if (res.status === 401) {
-                localStorage.removeItem('admin_token');
                 navigate('/admin/login');
             }
         } catch (e) {
             console.error('Failed to load genuine inquiry records', e);
         }
-    }, [token, processLeadUpdate, navigate]);
+    }, [processLeadUpdate, navigate]);
 
     const fetchProducts = useCallback(async () => {
         try {

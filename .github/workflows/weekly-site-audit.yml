@@ -1,0 +1,21 @@
+name: Weekly live-site audit
+
+on:
+  schedule:
+    - cron: '0 22 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-live-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check sitemap URLs and crawler controls
+        run: node frontend/scripts/check-live-links.mjs

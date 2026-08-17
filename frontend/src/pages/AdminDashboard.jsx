@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Trash2, Plus, Edit2, Check, X, ImagePlus, Users, MessageSquareShare, MessageCircle, CreditCard, Search, Building2, Phone, Calendar, MessageSquare, ChevronDown, ChevronUp, Bell, BellRing } from 'lucide-react';
+import { Trash2, Plus, Edit2, Check, X, ImagePlus, Users, MessageSquareShare, MessageCircle, CreditCard, Search, Building2, Phone, Calendar, MessageSquare, ChevronDown, ChevronUp, Bell, BellRing, ShieldCheck, RefreshCw } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
 import useInquiryNotifications from '../hooks/useInquiryNotifications';
 import { RATE_UNIT_OPTIONS, getRateUnitShortLabel } from '../utils/rateUnits';
+import { adminFetch, signOutAdmin } from '../utils/adminApi';
 
 const AdminDashboard = () => {
     const [activeTab, setActiveTab] = useState('inventory');
@@ -19,9 +20,11 @@ const AdminDashboard = () => {
     const [editUnit, setEditUnit] = useState('MT');
     const [inquirySearch, setInquirySearch] = useState('');
     const [expandedInquiry, setExpandedInquiry] = useState(null);
+    const [adminSessions, setAdminSessions] = useState([]);
+    const [loginHistory, setLoginHistory] = useState([]);
+    const [securityLoading, setSecurityLoading] = useState(false);
 
     const navigate = useNavigate();
-    const token = localStorage.getItem('admin_token');
     const API = API_BASE_URL;
     const {
         browserNotificationPermission,
@@ -42,22 +45,20 @@ const AdminDashboard = () => {
 
     const fetchLeads = useCallback(async () => {
         try {
-            const res = await fetch(`${API}/api/leads?t=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } });
+            const res = await adminFetch(`/api/leads?t=${Date.now()}`);
             if (res.ok) {
                 const data = await res.json();
                 processLeadUpdate(data);
                 setLeads(Array.isArray(data) ? data : []);
             } else if (res.status === 401) {
-                localStorage.removeItem('admin_token');
                 navigate('/admin/login');
             }
         } catch (error) {
             console.error('Failed to load genuine inquiry records', error);
         }
-    }, [API, token, processLeadUpdate, navigate]);
+    }, [processLeadUpdate, navigate]);
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchProducts();
     }, [fetchProducts]);
 
@@ -70,6 +71,42 @@ const AdminDashboard = () => {
         };
     }, [fetchLeads]);
 
+    const fetchSecurityActivity = useCallback(async () => {
+        setSecurityLoading(true);
+        try {
+            const [sessionsResponse, historyResponse] = await Promise.all([
+                adminFetch('/api/admin/sessions'),
+                adminFetch('/api/admin/login-history'),
+            ]);
+            if (sessionsResponse.status === 401 || historyResponse.status === 401) {
+                navigate('/admin/login');
+                return;
+            }
+            if (sessionsResponse.ok) setAdminSessions(await sessionsResponse.json());
+            if (historyResponse.ok) setLoginHistory(await historyResponse.json());
+        } catch {
+            toast.error('Unable to load admin security activity');
+        } finally {
+            setSecurityLoading(false);
+        }
+    }, [navigate]);
+
+    useEffect(() => {
+        if (activeTab === 'security') fetchSecurityActivity();
+    }, [activeTab, fetchSecurityActivity]);
+
+    const revokeSession = async (sessionId, isCurrent) => {
+        if (!window.confirm(isCurrent ? 'Revoke this session and sign out now?' : 'Revoke this admin session?')) return;
+        const response = await adminFetch(`/api/admin/sessions/${encodeURIComponent(sessionId)}/revoke`, { method: 'POST' });
+        if (response.ok) {
+            toast.success('Admin session revoked');
+            if (isCurrent) navigate('/admin/login');
+            else fetchSecurityActivity();
+        } else {
+            toast.error('Unable to revoke session');
+        }
+    };
+
     const generateBroadcast = () => {
         const date = new Date().toLocaleDateString('en-IN');
         let msg = `🚨 *Sri Srinivasa Canvassing* 🚨\n📍 Miryalaguda Live Market Rates\n📅 Date: ${date}\n\n`;
@@ -78,7 +115,10 @@ const AdminDashboard = () => {
         setBroadcastMessage(msg);
     };
 
-    const handleLogout = () => { localStorage.removeItem('admin_token'); navigate('/admin/login'); };
+    const handleLogout = async () => {
+        await signOutAdmin().catch(() => null);
+        navigate('/admin/login');
+    };
 
     const handleAddProduct = async (e) => {
         e.preventDefault();
@@ -89,7 +129,7 @@ const AdminDashboard = () => {
         formData.append('unit', newVariety.unit);
         if (newImage) formData.append('image', newImage);
         try {
-            const res = await fetch(`${API}/api/products/add`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData });
+            const res = await adminFetch('/api/products/add', { method: 'POST', body: formData });
             if (res.ok) { 
                 const added = await res.json();
                 toast.success(`${newVariety.name} added`); 
@@ -111,9 +151,9 @@ const AdminDashboard = () => {
 
     const handleSaveUpdate = async (id, confirmUnusual = false) => {
         try {
-            const res = await fetch(`${API}/api/products/update/${id}`, { 
-                method: 'PUT', 
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, 
+            const res = await adminFetch(`/api/products/update/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     name: editName, 
                     new_price_mt: parseFloat(editPrice),
@@ -148,7 +188,7 @@ const AdminDashboard = () => {
     const handleDelete = async (id, name) => {
         if (!window.confirm(`Archive ${name}? This will hide the variety from public view while preserving historical records.`)) return;
         try {
-            const res = await fetch(`${API}/api/products/delete/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+            const res = await adminFetch(`/api/products/delete/${id}`, { method: 'DELETE' });
             if (res.ok) { 
                 toast.success(`${name} archived successfully`); 
                 setProducts(prev => prev.filter(p => p.id !== id));
@@ -166,7 +206,7 @@ const AdminDashboard = () => {
         if (!file) return;
         const formData = new FormData(); formData.append('image', file);
         try {
-            const res = await fetch(`${API}/api/products/${id}/image`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData });
+            const res = await adminFetch(`/api/products/${id}/image`, { method: 'POST', body: formData });
             if (res.ok) { 
                 const updated = await res.json();
                 toast.success('Product image updated'); 
@@ -219,7 +259,7 @@ const AdminDashboard = () => {
 
                 {/* Tabs */}
                 <div className="flex gap-1 p-1 bg-surface dark:bg-secondary-light/30 rounded-2xl mb-8 border border-border dark:border-white/10">
-                    {[{ id: 'inventory', label: 'Live Inventory', icon: Plus }, { id: 'leads', label: `Inquiries & CRM (${leads.length})`, icon: Users }].map(tab => (
+                    {[{ id: 'inventory', label: 'Live Inventory', icon: Plus }, { id: 'leads', label: `Inquiries & CRM (${leads.length})`, icon: Users }, { id: 'security', label: 'Security', icon: ShieldCheck }].map(tab => (
                         <button key={tab.id} onClick={() => { setActiveTab(tab.id); if (tab.id === 'leads') clearUnreadInquiries(); }} className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all ${activeTab === tab.id ? 'bg-primary text-white shadow-lg shadow-primary/25' : 'text-text-muted dark:text-gray-400 hover:bg-surface-hover dark:hover:bg-white/5'}`}>
                             <tab.icon className="w-4 h-4" />{tab.label}
                         </button>
@@ -423,6 +463,12 @@ const AdminDashboard = () => {
                                                         <Phone className="w-3.5 h-3.5" />
                                                         {lead.whatsapp}
                                                     </a>
+                                                    <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                                                        Privacy consent: {lead.privacy_consent ? 'Recorded' : 'Legacy record'}
+                                                    </span>
+                                                    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${lead.marketing_consent ? 'bg-emerald/10 text-emerald' : 'bg-gray-500/10 text-text-muted'}`}>
+                                                        WhatsApp alerts: {lead.marketing_consent ? 'Opted in' : 'Not opted in'}
+                                                    </span>
                                                 </div>
 
                                                 {/* Inquiry text label */}
@@ -462,6 +508,56 @@ const AdminDashboard = () => {
                                 );
                             });
                         })()}
+                    </div>
+                )}
+
+                {activeTab === 'security' && (
+                    <div className="space-y-8">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-2xl font-display font-black text-text-main dark:text-white">Admin Security</h2>
+                                <p className="text-sm text-text-muted dark:text-gray-400 mt-1">Review active sessions and recent sign-in activity. IP addresses are stored only as irreversible fingerprints.</p>
+                            </div>
+                            <button type="button" onClick={fetchSecurityActivity} disabled={securityLoading} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60">
+                                <RefreshCw className={`w-4 h-4 ${securityLoading ? 'animate-spin' : ''}`} /> Refresh
+                            </button>
+                        </div>
+
+                        <div className="premium-card rounded-2xl overflow-hidden">
+                            <div className="p-5 border-b border-border dark:border-white/10"><h3 className="font-display font-bold text-text-main dark:text-white">Recent Sessions</h3></div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead><tr className="text-xs uppercase tracking-wider text-text-muted border-b border-border dark:border-white/10"><th className="p-4">Issued</th><th className="p-4">Last Seen</th><th className="p-4">Device</th><th className="p-4">Status</th><th className="p-4 text-right">Action</th></tr></thead>
+                                    <tbody className="divide-y divide-border dark:divide-white/5">
+                                        {adminSessions.map((session) => (
+                                            <tr key={session.session_id}>
+                                                <td className="p-4 whitespace-nowrap">{new Date(session.issued_at).toLocaleString('en-IN')}</td>
+                                                <td className="p-4 whitespace-nowrap">{session.last_seen_at ? new Date(session.last_seen_at).toLocaleString('en-IN') : '—'}</td>
+                                                <td className="p-4 max-w-xs truncate" title={session.user_agent}>{session.user_agent || 'Unknown'}<div className="text-xs text-text-muted mt-1">IP fingerprint: {session.ip_fingerprint || '—'}</div></td>
+                                                <td className="p-4"><span className={`px-2.5 py-1 rounded-full text-xs font-bold ${session.revoked_at ? 'bg-red-500/10 text-red-500' : 'bg-emerald/10 text-emerald'}`}>{session.revoked_at ? 'Revoked' : session.current ? 'Current' : 'Active'}</span></td>
+                                                <td className="p-4 text-right"><button type="button" disabled={Boolean(session.revoked_at)} onClick={() => revokeSession(session.session_id, session.current)} className="text-xs font-bold text-red-500 disabled:opacity-40">Revoke</button></td>
+                                            </tr>
+                                        ))}
+                                        {adminSessions.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-text-muted">No session records found.</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="premium-card rounded-2xl overflow-hidden">
+                            <div className="p-5 border-b border-border dark:border-white/10"><h3 className="font-display font-bold text-text-main dark:text-white">Login History</h3></div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead><tr className="text-xs uppercase tracking-wider text-text-muted border-b border-border dark:border-white/10"><th className="p-4">Time</th><th className="p-4">Username</th><th className="p-4">Outcome</th><th className="p-4">Reason</th><th className="p-4">IP Fingerprint</th></tr></thead>
+                                    <tbody className="divide-y divide-border dark:divide-white/5">
+                                        {loginHistory.map((event) => (
+                                            <tr key={event.id}><td className="p-4 whitespace-nowrap">{new Date(event.created_at).toLocaleString('en-IN')}</td><td className="p-4">{event.username}</td><td className="p-4 font-bold capitalize">{event.outcome}</td><td className="p-4">{event.reason || '—'}</td><td className="p-4 font-mono text-xs">{event.ip_fingerprint || '—'}</td></tr>
+                                        ))}
+                                        {loginHistory.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-text-muted">No login events found.</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

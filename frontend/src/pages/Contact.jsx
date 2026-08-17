@@ -1,9 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Mail, Phone, MapPin, Send, MessageCircle, Clock, CheckCircle2, ChevronRight, FileText, Linkedin } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { countries } from '../data/countries';
 import { API_BASE_URL } from '../config/api';
+import { PRODUCT_CATALOG } from '../data/productCatalog';
+import { RATE_UNIT_OPTIONS } from '../utils/rateUnits';
+import { trackEvent } from '../utils/analytics';
+import TurnstileWidget from '../components/TurnstileWidget';
+import { validateNationalPhoneNumber } from '../utils/phoneValidation';
+
+const createSubmissionId = () => (
+    globalThis.crypto?.randomUUID?.()
+    || `quote-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+);
 
 const Contact = () => {
     const [searchParams] = useSearchParams();
@@ -16,11 +26,13 @@ const Contact = () => {
         whatsapp: '',
         product_name: initialProduct,
         quantity_mt: '',
+        quantity_unit: 'MT',
         packaging_type: '50kg PP Bag',
         inquiry: '',
         honeypot: '',
         agree_privacy: false,
         subscribe_alerts: false,
+        client_submission_id: createSubmissionId(),
     });
 
     useEffect(() => {
@@ -31,9 +43,42 @@ const Contact = () => {
     }, [searchParams]);
 
     const [countryCode, setCountryCode] = useState('+91');
+    const [products, setProducts] = useState(PRODUCT_CATALOG);
     const [status, setStatus] = useState(null);
     const [rfqId, setRfqId] = useState(null);
+    const [confirmationStatus, setConfirmationStatus] = useState('not_configured');
     const [errorMessage, setErrorMessage] = useState('');
+    const [turnstileToken, setTurnstileToken] = useState('');
+    const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+    const formStartedRef = useRef(false);
+    const formViewedRef = useRef(false);
+
+    const handleTurnstileToken = useCallback((token) => setTurnstileToken(token), []);
+
+    useEffect(() => {
+        fetch(`${API_BASE_URL}/api/products`)
+            .then((response) => response.ok ? response.json() : Promise.reject(new Error('Product request failed')))
+            .then((data) => { if (Array.isArray(data) && data.length > 0) setProducts(data); })
+            .catch(() => null);
+    }, []);
+
+    useEffect(() => {
+        if (formViewedRef.current) return;
+        formViewedRef.current = true;
+        trackEvent('quote_form_view', {
+            source_page: 'contact',
+            product_requested: initialProduct,
+        });
+    }, [initialProduct]);
+
+    const markFormStarted = () => {
+        if (formStartedRef.current) return;
+        formStartedRef.current = true;
+        trackEvent('quote_form_start', {
+            source_page: 'contact',
+            product_requested: formData.product_name,
+        });
+    };
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -55,7 +100,18 @@ const Contact = () => {
         setErrorMessage('');
 
         try {
-            const fullNumber = `${countryCode}${formData.whatsapp}`;
+            const phoneValidation = validateNationalPhoneNumber(countryCode, formData.whatsapp);
+            if (!phoneValidation.valid) {
+                setErrorMessage(phoneValidation.message);
+                setStatus('error');
+                trackEvent('quote_form_failure', {
+                    source_page: 'contact',
+                    product_requested: formData.product_name,
+                    error_type: 'phone_validation',
+                });
+                return;
+            }
+            const fullNumber = phoneValidation.fullNumber;
             const payload = {
                 name: formData.name,
                 company: formData.company,
@@ -63,10 +119,15 @@ const Contact = () => {
                 whatsapp: fullNumber,
                 product_name: formData.product_name,
                 quantity_mt: formData.quantity_mt ? parseFloat(formData.quantity_mt) : null,
+                quantity_unit: formData.quantity_unit,
                 packaging_type: formData.packaging_type,
-                inquiry: `${formData.inquiry}${formData.subscribe_alerts ? ' | Opted in for Daily Price Alerts' : ''}`,
+                inquiry: formData.inquiry,
+                privacy_consent: formData.agree_privacy,
+                marketing_consent: formData.subscribe_alerts,
+                turnstile_token: turnstileToken || null,
                 honeypot: formData.honeypot,
-                source_page: 'contact'
+                source_page: 'contact',
+                client_submission_id: formData.client_submission_id,
             };
 
             const response = await fetch(`${API_BASE_URL}/api/contact`, {
@@ -81,13 +142,14 @@ const Contact = () => {
                     throw new Error('The server did not return a quote reference.');
                 }
                 setRfqId(data.request_id);
+                setConfirmationStatus(data.confirmation_status || 'not_configured');
                 setStatus('success');
-                window.dataLayer = window.dataLayer || [];
-                window.dataLayer.push({
-                    event: 'quote_form_success',
+                trackEvent('quote_form_success', {
                     request_id: data.request_id,
                     notification_status: data.notification_status || 'unknown',
-                    source_page: 'contact'
+                    confirmation_status: data.confirmation_status || 'unknown',
+                    source_page: 'contact',
+                    product_requested: formData.product_name,
                 });
                 window.dispatchEvent(new CustomEvent('lead:submitted', {
                     detail: {
@@ -100,10 +162,20 @@ const Contact = () => {
                 const errData = await response.json();
                 setErrorMessage(errData.detail || 'Failed to submit quote request. Please try again.');
                 setStatus('error');
+                trackEvent('quote_form_failure', {
+                    source_page: 'contact',
+                    product_requested: formData.product_name,
+                    error_type: `http_${response.status}`,
+                });
             }
         } catch (error) {
             setErrorMessage(error instanceof Error ? error.message : 'Network connection error. Please try again later.');
             setStatus('error');
+            trackEvent('quote_form_failure', {
+                source_page: 'contact',
+                product_requested: formData.product_name,
+                error_type: 'network',
+            });
         }
     };
 
@@ -148,7 +220,7 @@ const Contact = () => {
                                         <h3 className="font-black text-lg md:text-xl text-text-main mb-1 md:mb-2 uppercase tracking-wide">{c.title}</h3>
                                         <p className="text-base md:text-lg text-text-muted font-bold leading-relaxed">{c.detail}</p>
                                         {c.link && (
-                                            <a href={c.link} target="_blank" rel="noopener noreferrer" className="mt-2 md:mt-4 inline-flex items-center gap-2 text-primary font-black uppercase tracking-widest text-xs md:text-sm hover:underline">
+                                            <a href={c.link} target="_blank" rel="noopener noreferrer" onClick={() => { if (c.link.startsWith('https://wa.me/')) trackEvent('whatsapp_click', { source_page: 'contact', interaction_type: 'contact_details' }); }} className="mt-2 md:mt-4 inline-flex items-center gap-2 text-primary font-black uppercase tracking-widest text-xs md:text-sm hover:underline">
                                                 {c.linkText}
                                             </a>
                                         )}
@@ -173,10 +245,17 @@ const Contact = () => {
                                     <p className="text-text-muted font-bold text-base max-w-md mx-auto">
                                         Thank you, {formData.name}. Our export desk in Miryalaguda will review your requirements and contact you shortly via WhatsApp at {countryCode}{formData.whatsapp}.
                                     </p>
+                                    <p className="text-sm font-bold text-text-muted max-w-md mx-auto">
+                                        {confirmationStatus === 'delivered'
+                                            ? 'Your enquiry reference was also sent through the configured confirmation service.'
+                                            : 'Please save the reference ID shown above for follow-up.'}
+                                    </p>
                                     <button
                                         onClick={() => {
                                             setStatus(null);
-                                            setFormData(prev => ({ ...prev, inquiry: '' }));
+                                            setFormData(prev => ({ ...prev, inquiry: '', client_submission_id: createSubmissionId() }));
+                                            setTurnstileToken('');
+                                            setTurnstileResetKey((value) => value + 1);
                                         }}
                                         className="button-primary !py-3 !px-8 text-sm"
                                     >
@@ -186,6 +265,7 @@ const Contact = () => {
                             ) : (
                                 <form
                                     onSubmit={handleSubmit}
+                                    onFocusCapture={markFormStarted}
                                     method="post"
                                     action={`${API_BASE_URL}/api/contact`}
                                     className="space-y-6"
@@ -245,21 +325,28 @@ const Contact = () => {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                                         <div className="space-y-2">
                                             <label htmlFor="product_name" className="block text-xs font-black text-text-main uppercase tracking-widest">Rice Variety</label>
                                             <select id="product_name" name="product_name" value={formData.product_name} onChange={handleChange} className={inputClass}>
-                                                <option value="Sona Masuri Steam(BPT)">Sona Masuri Steam(BPT)</option>
-                                                <option value="Sona Masuri Raw(BPT)">Sona Masuri Raw(BPT)</option>
-                                                <option value="lachikari raw rice(JSR)">lachikari raw rice(JSR)</option>
-                                                <option value="RNR Steam">RNR Steam</option>
-                                                <option value="Jsr Steem Rice">Jsr Steem Rice</option>
+                                                {!products.some((product) => product.variety_name === formData.product_name) && (
+                                                    <option value={formData.product_name}>{formData.product_name}</option>
+                                                )}
+                                                {products.map((product) => (
+                                                    <option key={product.id || product.slug} value={product.variety_name}>{product.variety_name}</option>
+                                                ))}
                                                 <option value="Other / Multiple">Other / Multiple</option>
                                             </select>
                                         </div>
                                         <div className="space-y-2">
-                                            <label htmlFor="quantity_mt" className="block text-xs font-black text-text-main uppercase tracking-widest">Quantity (MT)</label>
+                                            <label htmlFor="quantity_mt" className="block text-xs font-black text-text-main uppercase tracking-widest">Quantity</label>
                                             <input type="number" min="1" id="quantity_mt" name="quantity_mt" value={formData.quantity_mt} onChange={handleChange} className={inputClass} placeholder="e.g. 50" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label htmlFor="quantity_unit" className="block text-xs font-black text-text-main uppercase tracking-widest">Quantity Unit</label>
+                                            <select id="quantity_unit" name="quantity_unit" value={formData.quantity_unit} onChange={handleChange} className={inputClass}>
+                                                {RATE_UNIT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                            </select>
                                         </div>
                                         <div className="space-y-2">
                                             <label htmlFor="packaging_type" className="block text-xs font-black text-text-main uppercase tracking-widest">Packaging</label>
@@ -294,9 +381,13 @@ const Contact = () => {
                                         </label>
                                     </div>
 
+                                    <TurnstileWidget key={turnstileResetKey} onToken={handleTurnstileToken} />
+
                                     <button type="submit" disabled={status === 'submitting'} className="button-primary w-full !py-4 !text-lg !rounded-xl shadow-xl shadow-primary/20">
                                         {status === 'submitting' ? 'Processing...' : 'Submit Quote Request'}
                                     </button>
+
+                                    <p className="text-center text-xs font-bold text-text-muted">Expected response time: within one business hour during Monday–Saturday operating hours.</p>
 
                                     {status === 'error' && (
                                         <div className="p-4 bg-red-500/10 text-red-500 rounded-xl text-sm font-bold text-center border border-red-500/20" role="alert">

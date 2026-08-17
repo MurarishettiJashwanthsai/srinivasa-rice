@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, MessageCircle } from 'lucide-react';
+import { trackEvent } from '../utils/analytics';
 
 const WhatsAppWidget = () => {
     const [isExpanded, setIsExpanded] = useState(false);
@@ -16,6 +17,7 @@ const WhatsAppWidget = () => {
     const handleSend = (msg) => {
         if (!msg) return;
         const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(msg)}`;
+        trackEvent('whatsapp_click', { source_page: window.location.pathname, interaction_type: 'template' });
         window.open(url, '_blank');
         setIsExpanded(false);
     };
@@ -77,6 +79,7 @@ const WhatsAppWidget = () => {
                                 <button
                                     onClick={() => {
                                         const url = `https://wa.me/${phoneNumber}`;
+                                        trackEvent('whatsapp_click', { source_page: window.location.pathname, interaction_type: 'custom' });
                                         window.open(url, '_blank');
                                         setIsExpanded(false);
                                     }}

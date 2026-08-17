@@ -3,16 +3,25 @@ import uuid
 import pytest
 
 os.environ.setdefault("SECRET_KEY", "test-only-secret-key-that-is-not-used-in-production")
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test_market_data.db")
 os.environ.setdefault("ADMIN_USERNAME", "admin@example.test")
 os.environ.setdefault("ADMIN_PASSWORD", "test-only-admin-password")
+os.environ.setdefault("ADMIN_COOKIE_SECURE", "false")
 from fastapi.testclient import TestClient
 from main import app
 from database import Base, engine, SessionLocal
-from models import RicePrice, Lead, RateAuditLog
+from models import RicePrice, Lead, RateAuditLog, AdminSession, AdminLoginHistory
 
 from migrate_db import run_migration
 
 client = TestClient(app)
+
+
+def login_admin():
+    return client.post(
+        "/api/admin/login",
+        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]},
+    )
 
 @pytest.fixture(autouse=True)
 def setup_test_db():
@@ -24,6 +33,7 @@ def setup_test_db():
         if db.query(RicePrice).count() == 0:
             p = RicePrice(
                 variety_name="Test Sona Masuri",
+                slug="test-sona-masuri",
                 current_price_mt=850.0,
                 previous_price_mt=840.0,
                 percentage_change=1.19,
@@ -41,6 +51,17 @@ def test_get_products():
     data = response.json()
     assert isinstance(data, list)
     assert len(data) > 0
+    assert "internal_note" not in data[0]
+    assert "updated_by" not in data[0]
+    assert "reviewed_by" not in data[0]
+
+
+def test_dynamic_sitemap_contains_published_products():
+    product = client.get("/api/products").json()[0]
+    response = client.get("/sitemap.xml")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/xml")
+    assert f"/products/{product['slug']}" in response.text
 
 def test_rfq_contact_submission():
     payload = {
@@ -54,9 +75,11 @@ def test_rfq_contact_submission():
         "quantity_mt": 100.0,
         "packaging_type": "50kg PP Bag",
         "incoterm": "FOB",
-        "inquiry": "Automated test quote inquiry for export."
+        "inquiry": "Automated test quote inquiry for export.",
+        "privacy_consent": True,
+        "marketing_consent": False,
     }
-    response = client.post("/api/contact", json=payload)
+    response = client.post("/api/contact", json=payload, headers={"x-forwarded-for": f"contact-{uuid.uuid4().hex}"})
     assert response.status_code == 200
     data = response.json()
     assert "request_id" in data
@@ -68,6 +91,9 @@ def test_rfq_contact_submission():
         saved_lead = db.query(Lead).filter(Lead.request_id == data["request_id"]).one()
         assert saved_lead.notification_status == data["notification_status"]
         assert saved_lead.source_page == "contact"
+        assert saved_lead.privacy_consent is True
+        assert saved_lead.marketing_consent is False
+        assert saved_lead.quantity_unit == "MT"
     finally:
         db.close()
 
@@ -84,13 +110,59 @@ def test_rfq_honeypot_bot_filtering():
     data = response.json()
     assert data["request_id"] == "RFQ-BOT-FILTERED"
 
-def test_admin_leads_hide_demo_rows_without_deleting_them():
-    login_resp = client.post(
-        "/api/admin/login",
-        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]}
+
+def test_rfq_requires_privacy_consent_and_valid_phone():
+    base_payload = {
+        "name": "Consent Test",
+        "company": "Example Company",
+        "whatsapp": "+919876543210",
+        "inquiry": "Test enquiry",
+    }
+    no_consent = client.post("/api/contact", json=base_payload)
+    assert no_consent.status_code == 400
+    assert "Privacy consent" in no_consent.json()["detail"]
+
+    invalid_phone = client.post(
+        "/api/contact",
+        json={**base_payload, "privacy_consent": True, "whatsapp": "123"},
     )
+    assert invalid_phone.status_code == 400
+    assert "WhatsApp number" in invalid_phone.json()["detail"]
+
+
+def test_admin_cookie_session_history_and_logout():
+    login_response = login_admin()
+    assert login_response.status_code == 200
+    assert login_response.json()["authenticated"] is True
+    assert "access_token" not in login_response.json()
+    assert "httponly" in login_response.headers["set-cookie"].lower()
+
+    session_response = client.get("/api/admin/session")
+    assert session_response.status_code == 200
+    sessions_response = client.get("/api/admin/sessions")
+    assert sessions_response.status_code == 200
+    assert any(item["current"] for item in sessions_response.json())
+    history_response = client.get("/api/admin/login-history")
+    assert history_response.status_code == 200
+    assert any(item["outcome"] == "success" for item in history_response.json())
+
+    logout_response = client.post("/api/admin/logout")
+    assert logout_response.status_code == 200
+    assert client.get("/api/admin/session").status_code == 401
+
+
+def test_rejects_unsupported_or_oversized_image_upload():
+    assert login_admin().status_code == 200
+    product = client.get("/api/products").json()[0]
+    unsupported = client.post(
+        f"/api/products/{product['id']}/image",
+        files={"image": ("unsafe.svg", b"<svg></svg>", "image/svg+xml")},
+    )
+    assert unsupported.status_code == 415
+
+def test_admin_leads_return_existing_rows_without_deleting_them():
+    login_resp = login_admin()
     assert login_resp.status_code == 200
-    headers = {"Authorization": f"Bearer {login_resp.json()['access_token']}"}
 
     demo_request_id = "RFQ-2026-A1B2"
     genuine_request_id = f"RFQ-TEST-{uuid.uuid4().hex[:8].upper()}"
@@ -123,11 +195,11 @@ def test_admin_leads_hide_demo_rows_without_deleting_them():
         db.add(genuine_lead)
         db.commit()
 
-        response = client.get("/api/leads", headers=headers)
+        response = client.get("/api/leads")
         assert response.status_code == 200
         returned_request_ids = {lead["request_id"] for lead in response.json()}
         assert genuine_request_id in returned_request_ids
-        assert demo_request_id not in returned_request_ids
+        assert demo_request_id in returned_request_ids
         assert db.query(Lead).filter(Lead.request_id == demo_request_id).first() is not None
     finally:
         db.query(Lead).filter(Lead.request_id == genuine_request_id).delete()
@@ -136,15 +208,37 @@ def test_admin_leads_hide_demo_rows_without_deleting_them():
         db.commit()
         db.close()
 
+
+def test_contact_submission_id_prevents_duplicate_enquiries():
+    submission_id = f"submission-{uuid.uuid4().hex}"
+    payload = {
+        "name": "Duplicate Protection Test",
+        "company": "Example Imports",
+        "email": "buyer@example.test",
+        "whatsapp": "+919876543210",
+        "inquiry": "Please send the latest bulk availability.",
+        "privacy_consent": True,
+        "client_submission_id": submission_id,
+    }
+    headers = {"x-forwarded-for": f"duplicate-{uuid.uuid4().hex}"}
+    first = client.post("/api/contact", json=payload, headers=headers)
+    second = client.post("/api/contact", json=payload, headers=headers)
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["request_id"] == second.json()["request_id"]
+
+    db = SessionLocal()
+    try:
+        assert db.query(Lead).filter(Lead.client_submission_id == submission_id).count() == 1
+    finally:
+        db.query(Lead).filter(Lead.client_submission_id == submission_id).delete()
+        db.commit()
+        db.close()
+
 def test_admin_login_and_price_update_audit():
     # Login
-    login_resp = client.post(
-        "/api/admin/login",
-        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]}
-    )
+    login_resp = login_admin()
     assert login_resp.status_code == 200
-    token = login_resp.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
 
     # Fetch product to update
     prods = client.get("/api/products").json()
@@ -157,14 +251,14 @@ def test_admin_login_and_price_update_audit():
         "reason": "Test Price Audit Entry",
         "confirm_unusual_rate": True
     }
-    update_resp = client.put(f"/api/products/update/{prod_id}", json=update_payload, headers=headers)
+    update_resp = client.put(f"/api/products/update/{prod_id}", json=update_payload)
     assert update_resp.status_code == 200
     updated_prod = update_resp.json()
     assert updated_prod["current_price_mt"] == 890.0
     assert updated_prod["unit"] == "QUINTAL"
 
     # Verify Rate Audit Log
-    logs_resp = client.get("/api/rate-audit-logs", headers=headers)
+    logs_resp = client.get("/api/rate-audit-logs")
     assert logs_resp.status_code == 200
     logs = logs_resp.json()
     assert len(logs) > 0
@@ -177,12 +271,8 @@ def test_product_slug_lookup():
         assert "variety_name" in data
 
 def test_unusual_rate_warning():
-    login_resp = client.post(
-        "/api/admin/login",
-        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]}
-    )
-    token = login_resp.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
+    login_resp = login_admin()
+    assert login_resp.status_code == 200
 
     prods = client.get("/api/products").json()
     prod_id = prods[0]["id"]
@@ -195,7 +285,7 @@ def test_unusual_rate_warning():
         "reason": "Test Spike Warning",
         "confirm_unusual_rate": False
     }
-    spike_resp = client.put(f"/api/products/update/{prod_id}", json=spike_payload, headers=headers)
+    spike_resp = client.put(f"/api/products/update/{prod_id}", json=spike_payload)
     assert spike_resp.status_code == 400
     assert "UNUSUAL RATE WARNING" in spike_resp.json()["detail"]
 
@@ -205,16 +295,12 @@ def test_unusual_rate_warning():
         "reason": "Confirmed Test Spike",
         "confirm_unusual_rate": True
     }
-    confirm_resp = client.put(f"/api/products/update/{prod_id}", json=confirm_payload, headers=headers)
+    confirm_resp = client.put(f"/api/products/update/{prod_id}", json=confirm_payload)
     assert confirm_resp.status_code == 200
 
 def test_rejects_ambiguous_or_unsupported_rate_unit():
-    login_resp = client.post(
-        "/api/admin/login",
-        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]}
-    )
-    token = login_resp.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
+    login_resp = login_admin()
+    assert login_resp.status_code == 200
     product = client.get("/api/products").json()[0]
 
     response = client.put(
@@ -224,8 +310,27 @@ def test_rejects_ambiguous_or_unsupported_rate_unit():
             "unit": "TON",
             "confirm_unusual_rate": True,
         },
-        headers=headers,
     )
 
     assert response.status_code == 400
     assert "Unsupported quantity unit" in response.json()["detail"]
+
+
+def test_login_rate_limit_and_temporary_lockout():
+    invalid_username = f"invalid-{uuid.uuid4().hex}@example.test"
+    request_headers = {"x-forwarded-for": f"test-{uuid.uuid4().hex}"}
+    for _ in range(5):
+        response = client.post(
+            "/api/admin/login",
+            data={"username": invalid_username, "password": "incorrect-password"},
+            headers=request_headers,
+        )
+        assert response.status_code == 401
+
+    blocked = client.post(
+        "/api/admin/login",
+        data={"username": invalid_username, "password": "incorrect-password"},
+        headers=request_headers,
+    )
+    assert blocked.status_code == 429
+    assert "Retry-After" in blocked.headers

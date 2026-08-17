@@ -1,10 +1,20 @@
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CreditCard, ExternalLink, LayoutDashboard, LogOut, MessageCircle, ShieldCheck } from 'lucide-react';
+import { adminFetch, signOutAdmin } from '../utils/adminApi';
 
 const AdminHeader = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const isAuthenticated = Boolean(localStorage.getItem('admin_token'));
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+    useEffect(() => {
+        let active = true;
+        adminFetch('/api/admin/session')
+            .then((response) => { if (active) setIsAuthenticated(response.ok); })
+            .catch(() => { if (active) setIsAuthenticated(false); });
+        return () => { active = false; };
+    }, [location.pathname]);
 
     const adminLinks = [
         { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
@@ -14,8 +24,9 @@ const AdminHeader = () => {
 
     const isActive = (path) => location.pathname === path;
 
-    const handleLogout = () => {
-        localStorage.removeItem('admin_token');
+    const handleLogout = async () => {
+        await signOutAdmin().catch(() => null);
+        setIsAuthenticated(false);
         navigate('/admin/login');
     };
 

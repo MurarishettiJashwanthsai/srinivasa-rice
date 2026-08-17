@@ -27,6 +27,7 @@ def run_migration():
         ("leads", "destination_port", "VARCHAR"),
         ("leads", "product_name", "VARCHAR"),
         ("leads", "quantity_mt", "FLOAT"),
+        ("leads", "quantity_unit", "VARCHAR DEFAULT 'MT'"),
         ("leads", "packaging_type", "VARCHAR"),
         ("leads", "incoterm", "VARCHAR"),
         ("leads", "status", "VARCHAR DEFAULT 'new'"),
@@ -36,6 +37,16 @@ def run_migration():
         ("leads", "notification_attempted_at", "VARCHAR"),
         ("leads", "notification_delivered_at", "VARCHAR"),
         ("leads", "notification_error", "TEXT"),
+        ("leads", "privacy_consent", "BOOLEAN DEFAULT FALSE"),
+        ("leads", "marketing_consent", "BOOLEAN DEFAULT FALSE"),
+        ("leads", "consent_at", "VARCHAR"),
+        ("leads", "confirmation_status", "VARCHAR DEFAULT 'pending'"),
+        ("leads", "confirmation_channel", "VARCHAR DEFAULT 'none'"),
+        ("leads", "confirmation_attempted_at", "VARCHAR"),
+        ("leads", "confirmation_delivered_at", "VARCHAR"),
+        ("leads", "confirmation_error", "TEXT"),
+        ("leads", "client_submission_id", "VARCHAR"),
+        ("leads", "ip_fingerprint", "VARCHAR"),
         ("leads", "created_at", "VARCHAR"),
     ]
 
@@ -49,6 +60,15 @@ def run_migration():
                         continue
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
                 print(f"Added column {col} to {table}")
+            except Exception:
+                pass
+
+        for index_name, table, column in [
+            ("ix_leads_client_submission_id", "leads", "client_submission_id"),
+            ("ix_leads_ip_fingerprint", "leads", "ip_fingerprint"),
+        ]:
+            try:
+                conn.execute(text(f"CREATE INDEX IF NOT EXISTS {index_name} ON {table} ({column})"))
             except Exception:
                 pass
 
