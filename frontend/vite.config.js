@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, isSsrBuild }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
   const verificationTags = [
     ['google-site-verification', env.VITE_GOOGLE_SITE_VERIFICATION],
@@ -35,5 +35,16 @@ export default defineConfig(({ mode }) => {
         },
       },
     ],
+    build: isSsrBuild ? {} : {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+            'motion-vendor': ['framer-motion'],
+            'ui-vendor': ['lucide-react', 'react-hot-toast'],
+          },
+        },
+      },
+    },
   }
 })

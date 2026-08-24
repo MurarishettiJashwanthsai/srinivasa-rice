@@ -1,0 +1,76 @@
+{
+  "expo": {
+    "name": "Sri Srinivasa Enterprise",
+    "slug": "srinivasa-canvassing",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "srinivasacanvassing",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/app-icon.png",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.srinivascanvassing.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false
+        }
+      }
+    },
+    "android": {
+      "package": "com.srinivascanvassing.app",
+      "allowBackup": false,
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/app-icon.png",
+        "backgroundColor": "#F7F5EF"
+      },
+      "permissions": []
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "../frontend/public/logo-256.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": false
+          }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "../frontend/public/logo.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#F7F5EF",
+          "dark": {
+            "backgroundColor": "#102A1D"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b854045b-39c9-444c-b50d-52aac14bdda8",
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b854045b-39c9-444c-b50d-52aac14bdda8"
+      }
+    }
+  }
+}

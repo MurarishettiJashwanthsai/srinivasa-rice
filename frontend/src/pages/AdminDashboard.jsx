@@ -107,6 +107,34 @@ const AdminDashboard = () => {
         }
     };
 
+    const revokeAllSessions = async () => {
+        if (!window.confirm('Sign out every admin device, including this one? You will need to log in again.')) return;
+        const response = await adminFetch('/api/admin/sessions/revoke-all', { method: 'POST' });
+        if (response.ok) {
+            toast.success('All admin sessions revoked');
+            navigate('/admin/login');
+        } else {
+            toast.error('Unable to revoke all sessions');
+        }
+    };
+
+    const updateLeadStatus = async (leadId, nextStatus) => {
+        const response = await adminFetch(`/api/leads/${leadId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: nextStatus }),
+        });
+        if (response.ok) {
+            const updatedLead = await response.json();
+            setLeads((current) => current.map((lead) => lead.id === leadId ? updatedLead : lead));
+            toast.success('Inquiry status updated');
+        } else if (response.status === 401) {
+            navigate('/admin/login');
+        } else {
+            toast.error('Unable to update inquiry status');
+        }
+    };
+
     const generateBroadcast = () => {
         const date = new Date().toLocaleDateString('en-IN');
         let msg = `🚨 *Sri Srinivasa Canvassing* 🚨\n📍 Miryalaguda Live Market Rates\n📅 Date: ${date}\n\n`;
@@ -362,8 +390,8 @@ const AdminDashboard = () => {
                                     </h2>
                                     <p className="text-sm text-text-muted dark:text-gray-400 mt-0.5">All customer inquiries received from the Contact page.</p>
                                 </div>
-                                <button onClick={() => { const nums = leads.map(l => l.whatsapp).filter(Boolean).join(', '); if (nums) { navigator.clipboard.writeText(nums); toast.success("Numbers copied!"); } else toast.error("No numbers"); }} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald/10 text-emerald border border-emerald/20 text-sm font-semibold hover:bg-emerald/20 transition-all">
-                                    <MessageSquareShare className="w-4 h-4" />Copy All WhatsApp Numbers
+                                <button onClick={() => { const nums = leads.filter(l => l.marketing_consent === true).map(l => l.whatsapp).filter(Boolean).join(', '); if (nums) { navigator.clipboard.writeText(nums); toast.success("Opted-in numbers copied"); } else toast.error("No customers have opted in to WhatsApp marketing"); }} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald/10 text-emerald border border-emerald/20 text-sm font-semibold hover:bg-emerald/20 transition-all">
+                                    <MessageSquareShare className="w-4 h-4" />Copy Opted-In WhatsApp Numbers
                                 </button>
                             </div>
 
@@ -469,6 +497,21 @@ const AdminDashboard = () => {
                                                     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${lead.marketing_consent ? 'bg-emerald/10 text-emerald' : 'bg-gray-500/10 text-text-muted'}`}>
                                                         WhatsApp alerts: {lead.marketing_consent ? 'Opted in' : 'Not opted in'}
                                                     </span>
+                                                    <label className="inline-flex items-center gap-2 text-xs font-bold text-text-muted">
+                                                        CRM status
+                                                        <select
+                                                            value={lead.status || 'new'}
+                                                            onChange={(event) => updateLeadStatus(lead.id, event.target.value)}
+                                                            className="rounded-lg border border-border dark:border-white/10 bg-surface dark:bg-secondary-light/30 px-2.5 py-1.5 text-xs font-bold text-text-main dark:text-white"
+                                                        >
+                                                            <option value="new">New</option>
+                                                            <option value="contacted">Contacted</option>
+                                                            <option value="qualified">Qualified</option>
+                                                            <option value="quoted">Quoted</option>
+                                                            <option value="won">Won</option>
+                                                            <option value="closed">Closed</option>
+                                                        </select>
+                                                    </label>
                                                 </div>
 
                                                 {/* Inquiry text label */}
@@ -518,9 +561,14 @@ const AdminDashboard = () => {
                                 <h2 className="text-2xl font-display font-black text-text-main dark:text-white">Admin Security</h2>
                                 <p className="text-sm text-text-muted dark:text-gray-400 mt-1">Review active sessions and recent sign-in activity. IP addresses are stored only as irreversible fingerprints.</p>
                             </div>
-                            <button type="button" onClick={fetchSecurityActivity} disabled={securityLoading} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60">
-                                <RefreshCw className={`w-4 h-4 ${securityLoading ? 'animate-spin' : ''}`} /> Refresh
-                            </button>
+                            <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={revokeAllSessions} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 text-sm font-bold">
+                                    Sign Out All Devices
+                                </button>
+                                <button type="button" onClick={fetchSecurityActivity} disabled={securityLoading} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60">
+                                    <RefreshCw className={`w-4 h-4 ${securityLoading ? 'animate-spin' : ''}`} /> Refresh
+                                </button>
+                            </div>
                         </div>
 
                         <div className="premium-card rounded-2xl overflow-hidden">

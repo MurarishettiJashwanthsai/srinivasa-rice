@@ -78,6 +78,23 @@ class Lead(Base):
     client_submission_id: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)
     ip_fingerprint: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)
     created_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    updated_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    updated_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    follow_up_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    internal_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+class LeadAuditLog(Base):
+    __tablename__ = "lead_audit_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    lead_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    old_status: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    new_status: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    admin_user: Mapped[str] = mapped_column(String, nullable=False)
+    details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    timestamp: Mapped[str] = mapped_column(String, nullable=False)
 
 
 class AdminSession(Base):

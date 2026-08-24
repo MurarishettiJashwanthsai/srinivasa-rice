@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from typing import Optional
+from urllib.parse import urlparse
 from xml.sax.saxutils import escape as xml_escape
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -22,9 +23,10 @@ from sqlalchemy import text
 import cloudinary
 import httpx
 from dotenv import load_dotenv
+from passlib.hash import pbkdf2_sha256
 
 from database import engine, Base, get_db
-from models import RicePrice, Lead, RateAuditLog, AdminSession, AdminLoginHistory
+from models import RicePrice, Lead, LeadAuditLog, RateAuditLog, AdminSession, AdminLoginHistory
 
 load_dotenv()
 
@@ -41,7 +43,14 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_HOURS = int(os.getenv("ACCESS_TOKEN_HOURS", "8"))
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip().lower()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
-ADMIN_PASSWORD_MIN_LENGTH = int(os.getenv("ADMIN_PASSWORD_MIN_LENGTH", "1"))
+ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "").strip()
+ADMIN_PASSWORD_MIN_LENGTH = int(os.getenv("ADMIN_PASSWORD_MIN_LENGTH", "14"))
+if ADMIN_PASSWORD and not ADMIN_PASSWORD_HASH:
+    warnings.warn(
+        "ADMIN_PASSWORD is a legacy migration setting. Configure ADMIN_PASSWORD_HASH and then remove ADMIN_PASSWORD.",
+        RuntimeWarning,
+        stacklevel=1,
+    )
 ADMIN_COOKIE_NAME = os.getenv("ADMIN_COOKIE_NAME", "ssc_admin_session").strip() or "ssc_admin_session"
 ADMIN_COOKIE_SECURE = os.getenv("ADMIN_COOKIE_SECURE", "true").strip().lower() != "false"
 LOGIN_MAX_ATTEMPTS = int(os.getenv("LOGIN_MAX_ATTEMPTS", "5"))
@@ -89,11 +98,21 @@ def iso_utc(value: Optional[datetime.datetime] = None) -> str:
 def admin_configuration_error() -> Optional[str]:
     if not CONFIGURED_SECRET_KEY:
         return "SECRET_KEY must be configured in the Render backend environment"
-    if not ADMIN_USERNAME or not ADMIN_PASSWORD:
-        return "ADMIN_USERNAME and ADMIN_PASSWORD must be configured in the Render backend environment"
-    if len(ADMIN_PASSWORD) < ADMIN_PASSWORD_MIN_LENGTH:
+    if not ADMIN_USERNAME or not (ADMIN_PASSWORD_HASH or ADMIN_PASSWORD):
+        return "ADMIN_USERNAME and ADMIN_PASSWORD_HASH must be configured in the Render backend environment"
+    if not ADMIN_PASSWORD_HASH and len(ADMIN_PASSWORD) < ADMIN_PASSWORD_MIN_LENGTH:
         return f"ADMIN_PASSWORD must contain at least {ADMIN_PASSWORD_MIN_LENGTH} characters"
     return None
+
+
+def verify_admin_password(candidate: str) -> bool:
+    """Prefer a one-way password hash while retaining an explicit migration path."""
+    if ADMIN_PASSWORD_HASH:
+        try:
+            return pbkdf2_sha256.verify(candidate, ADMIN_PASSWORD_HASH)
+        except (TypeError, ValueError):
+            return False
+    return bool(ADMIN_PASSWORD) and hmac.compare_digest(candidate, ADMIN_PASSWORD)
 
 
 def client_ip_fingerprint(request: Request) -> str:
@@ -225,7 +244,7 @@ def decode_admin_token(token: str) -> dict:
 # Security scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/admin/login", auto_error=False)
 
-# Cloudinary is optional. Local fallback storage remains available when it is not configured.
+# Cloudinary is optional for local development; production rejects uploads unless durable storage is configured.
 CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()
 CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "").strip()
 CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "").strip()
@@ -310,8 +329,43 @@ app.add_middleware(
 )
 
 
+def normalized_origin(value: str) -> str:
+    parsed = urlparse(value.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
+
+
+ALLOWED_ADMIN_ORIGINS = {normalized_origin(value) for value in origins if normalized_origin(value)}
+ADMIN_MUTATION_PREFIXES = (
+    "/api/admin/",
+    "/api/products/add",
+    "/api/products/update/",
+    "/api/products/delete/",
+    "/api/leads/",
+)
+
+
+def is_admin_mutation_request(request: Request) -> bool:
+    if request.method.upper() not in {"POST", "PUT", "PATCH", "DELETE"}:
+        return False
+    path = request.url.path
+    if path.startswith(ADMIN_MUTATION_PREFIXES):
+        return True
+    return path.startswith("/api/products/") and path.endswith("/image")
+
+
 @app.middleware("http")
 async def apply_api_security_headers(request: Request, call_next):
+    if IS_PRODUCTION and is_admin_mutation_request(request):
+        request_origin = normalized_origin(request.headers.get("origin", ""))
+        if not request_origin or request_origin not in ALLOWED_ADMIN_ORIGINS:
+            return FastAPIResponse(
+                content='{"detail":"Untrusted administrator request origin"}',
+                status_code=status.HTTP_403_FORBIDDEN,
+                media_type="application/json",
+                headers={"Cache-Control": "no-store"},
+            )
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -407,6 +461,12 @@ class ProductUpdate(BaseModel):
     public_note: Optional[str] = None
     internal_note: Optional[str] = None
 
+
+class LeadUpdate(BaseModel):
+    status: Optional[str] = None
+    follow_up_at: Optional[str] = None
+    internal_notes: Optional[str] = None
+
 # --- Routes ---
 
 @app.post("/api/admin/login")
@@ -417,7 +477,7 @@ async def login(
     db: Session = Depends(get_db),
 ):
     username = form_data.username.strip().lower()
-    password = form_data.password.strip()
+    password = form_data.password
 
     configuration_error = admin_configuration_error()
     if configuration_error:
@@ -442,7 +502,7 @@ async def login(
 
     credentials_valid = (
         hmac.compare_digest(username, ADMIN_USERNAME)
-        and hmac.compare_digest(password, ADMIN_PASSWORD)
+        and verify_admin_password(password)
     )
 
     if credentials_valid:
@@ -555,6 +615,29 @@ async def list_admin_sessions(
         "user_agent": item.user_agent,
         "current": item.session_id == current_session.session_id,
     } for item in sessions]
+
+
+@app.post("/api/admin/sessions/revoke-all")
+async def revoke_all_admin_sessions(
+    response: Response,
+    _: AdminSession = Depends(get_current_session),
+    db: Session = Depends(get_db),
+):
+    """Emergency sign-out for every administrator device, including this one."""
+    revoked_at = iso_utc()
+    active_sessions = db.query(AdminSession).filter(AdminSession.revoked_at.is_(None)).all()
+    for active_session in active_sessions:
+        active_session.revoked_at = revoked_at
+    db.commit()
+    response.delete_cookie(
+        ADMIN_COOKIE_NAME,
+        path="/",
+        secure=ADMIN_COOKIE_SECURE,
+        httponly=True,
+        samesite="strict",
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return {"message": "All admin sessions revoked", "revoked_count": len(active_sessions)}
 
 
 @app.post("/api/admin/sessions/{session_id}/revoke")
@@ -948,6 +1031,10 @@ async def verify_turnstile(token: Optional[str], request: Request) -> None:
     if not verification.get("success"):
         raise HTTPException(status_code=400, detail="Anti-spam verification failed. Please try again")
 
+    expected_hostname = urlparse(SITE_URL).hostname
+    if expected_hostname and verification.get("hostname") != expected_hostname:
+        raise HTTPException(status_code=400, detail="Anti-spam verification came from an unauthorized hostname")
+
 
 @app.post("/api/contact")
 async def handle_contact(
@@ -996,7 +1083,7 @@ async def handle_contact(
 
     request_id = f"RFQ-{datetime.datetime.now().year}-{secrets.token_hex(3).upper()}"
     try:
-        allowed_sources = {"contact", "price-alert"}
+        allowed_sources = {"contact", "price-alert", "mobile-app"}
         source_page = form_data.source_page if form_data.source_page in allowed_sources else "contact"
         new_lead = Lead(
             request_id=request_id,
@@ -1099,6 +1186,19 @@ async def handle_contact(
             "notification_status": new_lead.notification_status,
             "confirmation_status": new_lead.confirmation_status,
         }
+    except IntegrityError as error:
+        db.rollback()
+        if client_submission_id:
+            existing_lead = db.query(Lead).filter(Lead.client_submission_id == client_submission_id).first()
+            if existing_lead:
+                return {
+                    "message": "Inquiry already received successfully.",
+                    "request_id": existing_lead.request_id,
+                    "notification_status": existing_lead.notification_status,
+                    "confirmation_status": existing_lead.confirmation_status,
+                }
+        print(f"Lead integrity check failed: {error}")
+        raise HTTPException(status_code=409, detail="This enquiry was already received. Please refresh and check your reference.") from error
     except Exception as e:
         db.rollback()
         print(f"Failed to save lead: {e}")
@@ -1112,6 +1212,65 @@ async def get_leads(
     leads = db.query(Lead).order_by(Lead.id.desc()).all()
     # Preserve and return every genuine record. No demo identifiers are filtered here.
     return leads
+
+
+@app.patch("/api/leads/{lead_id}")
+async def update_lead(
+    lead_id: int,
+    update: LeadUpdate,
+    current_user: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Inquiry not found")
+
+    old_status = lead.status
+    changed_fields = []
+    if update.status is not None:
+        normalized_status = update.status.strip().lower()
+        allowed_statuses = {"new", "contacted", "qualified", "quoted", "won", "closed"}
+        if normalized_status not in allowed_statuses:
+            raise HTTPException(status_code=400, detail="Unsupported inquiry status")
+        if normalized_status != lead.status:
+            lead.status = normalized_status
+            changed_fields.append("status")
+
+    if update.follow_up_at is not None:
+        follow_up_at = update.follow_up_at.strip() or None
+        if follow_up_at and len(follow_up_at) > 40:
+            raise HTTPException(status_code=400, detail="Follow-up date is invalid")
+        if follow_up_at != lead.follow_up_at:
+            lead.follow_up_at = follow_up_at
+            changed_fields.append("follow_up_at")
+
+    if update.internal_notes is not None:
+        notes = update.internal_notes.strip() or None
+        if notes and len(notes) > 2_000:
+            raise HTTPException(status_code=400, detail="Internal notes must be 2,000 characters or fewer")
+        if notes != lead.internal_notes:
+            lead.internal_notes = notes
+            changed_fields.append("internal_notes")
+
+    if not changed_fields:
+        return lead
+
+    changed_at = iso_utc()
+    lead.updated_at = changed_at
+    lead.updated_by = current_user
+    db.add(LeadAuditLog(
+        lead_id=lead.id,
+        action="UPDATE",
+        old_status=old_status,
+        new_status=lead.status,
+        admin_user=current_user,
+        details=",".join(changed_fields),
+        timestamp=changed_at,
+    ))
+    db.commit()
+    db.refresh(lead)
+    return lead
+
 
 @app.get("/api/rate-audit-logs")
 async def get_rate_audit_logs(

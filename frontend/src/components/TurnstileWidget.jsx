@@ -3,12 +3,15 @@ import { useEffect, useRef } from 'react';
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim();
 const SCRIPT_ID = 'cloudflare-turnstile-script';
 
-const TurnstileWidget = ({ onToken }) => {
+const TurnstileWidget = ({ onToken, onError, onExpire }) => {
     const containerRef = useRef(null);
     const widgetIdRef = useRef(null);
 
     useEffect(() => {
-        if (!SITE_KEY || typeof window === 'undefined') return undefined;
+        if (!SITE_KEY || typeof window === 'undefined') {
+            onError?.();
+            return undefined;
+        }
 
         let cancelled = false;
         const renderWidget = () => {
@@ -16,8 +19,14 @@ const TurnstileWidget = ({ onToken }) => {
             widgetIdRef.current = window.turnstile.render(containerRef.current, {
                 sitekey: SITE_KEY,
                 callback: (token) => onToken(token),
-                'expired-callback': () => onToken(''),
-                'error-callback': () => onToken(''),
+                'expired-callback': () => {
+                    onToken('');
+                    onExpire?.();
+                },
+                'error-callback': () => {
+                    onToken('');
+                    onError?.();
+                },
                 theme: 'auto',
             });
         };
@@ -43,7 +52,7 @@ const TurnstileWidget = ({ onToken }) => {
                 widgetIdRef.current = null;
             }
         };
-    }, [onToken]);
+    }, [onError, onExpire, onToken]);
 
     if (!SITE_KEY) return null;
     return <div ref={containerRef} className="min-h-[65px]" aria-label="Anti-spam verification" />;

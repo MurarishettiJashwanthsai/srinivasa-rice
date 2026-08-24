@@ -48,6 +48,10 @@ def run_migration():
         ("leads", "client_submission_id", "VARCHAR"),
         ("leads", "ip_fingerprint", "VARCHAR"),
         ("leads", "created_at", "VARCHAR"),
+        ("leads", "updated_at", "VARCHAR"),
+        ("leads", "updated_by", "VARCHAR"),
+        ("leads", "follow_up_at", "VARCHAR"),
+        ("leads", "internal_notes", "TEXT"),
     ]
 
     with engine.begin() as conn:
@@ -60,8 +64,8 @@ def run_migration():
                         continue
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
                 print(f"Added column {col} to {table}")
-            except Exception:
-                pass
+            except Exception as error:
+                print(f"Migration warning for {table}.{col}: {error}")
 
         for index_name, table, column in [
             ("ix_leads_client_submission_id", "leads", "client_submission_id"),
@@ -69,8 +73,33 @@ def run_migration():
         ]:
             try:
                 conn.execute(text(f"CREATE INDEX IF NOT EXISTS {index_name} ON {table} ({column})"))
-            except Exception:
-                pass
+            except Exception as error:
+                print(f"Index warning for {table}.{column}: {error}")
+
+        # Add race-safe idempotency only when genuine historical rows are already unique.
+        # If duplicates exist, preserve them and report the issue instead of deleting data.
+        for index_name, column in [
+            ("uq_leads_request_id_nonempty", "request_id"),
+            ("uq_leads_client_submission_id_nonempty", "client_submission_id"),
+        ]:
+            duplicate = conn.execute(text(
+                f"SELECT {column}, COUNT(*) FROM leads "
+                f"WHERE {column} IS NOT NULL AND {column} <> '' "
+                f"GROUP BY {column} HAVING COUNT(*) > 1 LIMIT 1"
+            )).fetchone()
+            if duplicate:
+                print(
+                    f"Integrity warning: unique index {index_name} was not created because "
+                    f"duplicate historical {column} values exist. No records were changed."
+                )
+                continue
+            try:
+                conn.execute(text(
+                    f"CREATE UNIQUE INDEX IF NOT EXISTS {index_name} ON leads ({column}) "
+                    f"WHERE {column} IS NOT NULL AND {column} <> ''"
+                ))
+            except Exception as error:
+                print(f"Unique index warning for leads.{column}: {error}")
 
 if __name__ == "__main__":
     run_migration()

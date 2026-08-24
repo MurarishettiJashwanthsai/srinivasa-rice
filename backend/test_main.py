@@ -8,9 +8,11 @@ os.environ.setdefault("ADMIN_USERNAME", "admin@example.test")
 os.environ.setdefault("ADMIN_PASSWORD", "test-only-admin-password")
 os.environ.setdefault("ADMIN_COOKIE_SECURE", "false")
 from fastapi.testclient import TestClient
+from passlib.hash import pbkdf2_sha256
+import main as main_module
 from main import app
 from database import Base, engine, SessionLocal
-from models import RicePrice, Lead, RateAuditLog, AdminSession, AdminLoginHistory
+from models import RicePrice, Lead, LeadAuditLog, RateAuditLog, AdminSession, AdminLoginHistory
 
 from migrate_db import run_migration
 
@@ -151,6 +153,39 @@ def test_admin_cookie_session_history_and_logout():
     assert client.get("/api/admin/session").status_code == 401
 
 
+def test_hashed_admin_password_verification(monkeypatch):
+    password = "unique test administrator password"
+    monkeypatch.setattr(main_module, "ADMIN_PASSWORD_HASH", pbkdf2_sha256.hash(password))
+    monkeypatch.setattr(main_module, "ADMIN_PASSWORD", "")
+    assert main_module.verify_admin_password(password) is True
+    assert main_module.verify_admin_password("incorrect password") is False
+
+
+def test_production_admin_mutations_require_trusted_origin(monkeypatch):
+    monkeypatch.setattr(main_module, "IS_PRODUCTION", True)
+    rejected = client.post(
+        "/api/admin/login",
+        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]},
+        headers={"Origin": "https://attacker.example"},
+    )
+    assert rejected.status_code == 403
+
+    accepted = client.post(
+        "/api/admin/login",
+        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]},
+        headers={"Origin": "https://www.srinivascanvassing.com"},
+    )
+    assert accepted.status_code == 200
+
+
+def test_revoke_all_admin_sessions_signs_out_current_device():
+    assert login_admin().status_code == 200
+    response = client.post("/api/admin/sessions/revoke-all")
+    assert response.status_code == 200
+    assert response.json()["revoked_count"] >= 1
+    assert client.get("/api/admin/session").status_code == 401
+
+
 def test_rejects_unsupported_or_oversized_image_upload():
     assert login_admin().status_code == 200
     product = client.get("/api/products").json()[0]
@@ -206,6 +241,41 @@ def test_admin_leads_return_existing_rows_without_deleting_them():
         if created_demo:
             db.query(Lead).filter(Lead.request_id == demo_request_id).delete()
         db.commit()
+        db.close()
+
+
+def test_admin_can_update_inquiry_status_with_audit_history():
+    assert login_admin().status_code == 200
+    request_id = f"RFQ-STATUS-{uuid.uuid4().hex[:8].upper()}"
+    db = SessionLocal()
+    try:
+        lead = Lead(
+            request_id=request_id,
+            name="CRM Status Test",
+            company="Example Company",
+            whatsapp="+919999999998",
+            inquiry_text="Test CRM lifecycle update.",
+            status="new",
+            source_page="contact",
+        )
+        db.add(lead)
+        db.commit()
+        db.refresh(lead)
+        lead_id = lead.id
+
+        response = client.patch(f"/api/leads/{lead_id}", json={"status": "contacted"})
+        assert response.status_code == 200
+        assert response.json()["status"] == "contacted"
+        db.expire_all()
+        assert db.query(Lead).filter(Lead.id == lead_id).one().status == "contacted"
+        audit = db.query(LeadAuditLog).filter(LeadAuditLog.lead_id == lead_id).one()
+        assert audit.old_status == "new"
+        assert audit.new_status == "contacted"
+    finally:
+        if 'lead_id' in locals():
+            db.query(LeadAuditLog).filter(LeadAuditLog.lead_id == lead_id).delete()
+            db.query(Lead).filter(Lead.id == lead_id).delete()
+            db.commit()
         db.close()
 
 

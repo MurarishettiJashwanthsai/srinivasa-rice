@@ -16,6 +16,19 @@
           "value": "noindex, nofollow, noarchive"
         }
       ]
+    },
+    {
+      "source": "/mobile-turnstile",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow, noarchive"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
     }
   ],
   "rewrites": [
@@ -25,6 +38,10 @@
     },
     {
       "source": "/card/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/mobile-turnstile",
       "destination": "/index.html"
     }
   ]

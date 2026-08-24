@@ -21,7 +21,7 @@ export const useInquiryNotifications = () => {
             Number(lead.id) > Number(latest.id) ? lead : latest
         ));
         const toastMessage = newLeads.length === 1
-            ? `New inquiry from ${newestLead.name} (${newestLead.request_id || 'New lead'})`
+            ? `New inquiry received (${newestLead.request_id || 'Open CRM for details'})`
             : `${newLeads.length} new inquiries received in CRM`;
 
         toast.success(toastMessage, { duration: 8000 });
@@ -30,7 +30,7 @@ export const useInquiryNotifications = () => {
         if (permission === 'granted') {
             const browserNotification = new window.Notification('New CRM inquiry', {
                 body: newLeads.length === 1
-                    ? `${newestLead.name} — ${newestLead.product_name || 'General inquiry'}`
+                    ? 'Open the protected admin CRM to review it.'
                     : `${newLeads.length} new customer inquiries were received.`,
                 icon: '/logo-256.png',
                 tag: `crm-lead-${newestLead.id}`,

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import Navbar from './components/Navbar';
 import AdminHeader from './components/AdminHeader';
@@ -23,6 +23,7 @@ import SkipLink from './components/SkipLink';
 import StructuredData from './components/StructuredData';
 import ErrorBoundary from './components/ErrorBoundary';
 import Analytics from './components/Analytics';
+import MobileTurnstile from './pages/MobileTurnstile';
 
 // Admin-only pages remain code split; public pages are synchronously renderable at build time.
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
@@ -53,6 +54,9 @@ const AdminPage = ({ children }) => (
 );
 
 export function AppContent() {
+    const location = useLocation();
+    if (location.pathname === '/mobile-turnstile') return <MobileTurnstile />;
+
     return (
         <>
             <SkipLink />
