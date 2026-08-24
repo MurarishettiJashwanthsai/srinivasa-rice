@@ -59,7 +59,7 @@
       "typedRoutes": true
     },
     "runtimeVersion": {
-      "policy": "fingerprint"
+      "policy": "appVersion"
     },
     "updates": {
       "url": "https://u.expo.dev/b854045b-39c9-444c-b50d-52aac14bdda8",
