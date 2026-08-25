@@ -35,9 +35,12 @@ const MarketDashboard = () => {
     };
 
     useEffect(() => {
-        fetchPrices();
-        const interval = setInterval(fetchPrices, 60000);
-        return () => clearInterval(interval);
+        const initialFetch = window.setTimeout(fetchPrices, 0);
+        const interval = window.setInterval(fetchPrices, 60000);
+        return () => {
+            window.clearTimeout(initialFetch);
+            window.clearInterval(interval);
+        };
     }, []);
 
     const handleSort = (field) => {

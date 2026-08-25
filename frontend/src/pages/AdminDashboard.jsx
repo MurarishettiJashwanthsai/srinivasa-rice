@@ -59,7 +59,8 @@ const AdminDashboard = () => {
     }, [processLeadUpdate, navigate]);
 
     useEffect(() => {
-        fetchProducts();
+        const initialProductFetch = window.setTimeout(fetchProducts, 0);
+        return () => window.clearTimeout(initialProductFetch);
     }, [fetchProducts]);
 
     useEffect(() => {
@@ -92,7 +93,9 @@ const AdminDashboard = () => {
     }, [navigate]);
 
     useEffect(() => {
-        if (activeTab === 'security') fetchSecurityActivity();
+        if (activeTab !== 'security') return undefined;
+        const securityFetch = window.setTimeout(fetchSecurityActivity, 0);
+        return () => window.clearTimeout(securityFetch);
     }, [activeTab, fetchSecurityActivity]);
 
     const revokeSession = async (sessionId, isCurrent) => {

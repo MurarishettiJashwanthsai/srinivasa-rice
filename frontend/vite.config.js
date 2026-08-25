@@ -38,10 +38,24 @@ export default defineConfig(({ mode, isSsrBuild }) => {
     build: isSsrBuild ? {} : {
       rollupOptions: {
         output: {
-          manualChunks: {
-            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-            'motion-vendor': ['framer-motion'],
-            'ui-vendor': ['lucide-react', 'react-hot-toast'],
+          manualChunks(id) {
+            const moduleId = id.replaceAll('\\', '/')
+            if (moduleId.includes('/node_modules/react/')
+              || moduleId.includes('/node_modules/react-dom/')
+              || moduleId.includes('/node_modules/react-router/')
+              || moduleId.includes('/node_modules/react-router-dom/')) {
+              return 'react-vendor'
+            }
+            if (moduleId.includes('/node_modules/framer-motion/')
+              || moduleId.includes('/node_modules/motion-dom/')
+              || moduleId.includes('/node_modules/motion-utils/')) {
+              return 'motion-vendor'
+            }
+            if (moduleId.includes('/node_modules/lucide-react/')
+              || moduleId.includes('/node_modules/react-hot-toast/')) {
+              return 'ui-vendor'
+            }
+            return undefined
           },
         },
       },

@@ -37,9 +37,11 @@ const Contact = () => {
 
     useEffect(() => {
         const prodParam = searchParams.get('product');
-        if (prodParam) {
+        if (!prodParam) return undefined;
+        const productSelection = window.setTimeout(() => {
             setFormData(prev => ({ ...prev, product_name: prodParam }));
-        }
+        }, 0);
+        return () => window.clearTimeout(productSelection);
     }, [searchParams]);
 
     const [countryCode, setCountryCode] = useState('+91');

@@ -62,10 +62,15 @@ const WhatsAppCRM = () => {
     }, []);
 
     useEffect(() => {
-        fetchLeads();
-        fetchProducts();
+        const initialFetch = window.setTimeout(() => {
+            void fetchLeads();
+            void fetchProducts();
+        }, 0);
         const leadPollingInterval = window.setInterval(fetchLeads, 30000);
-        return () => window.clearInterval(leadPollingInterval);
+        return () => {
+            window.clearTimeout(initialFetch);
+            window.clearInterval(leadPollingInterval);
+        };
     }, [fetchLeads, fetchProducts]);
 
     const generatePriceList = () => {
