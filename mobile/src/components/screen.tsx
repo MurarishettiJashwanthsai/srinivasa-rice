@@ -1,6 +1,7 @@
-import type { PropsWithChildren, ReactNode } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useRef, useState, type PropsWithChildren, type ReactNode } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BackToTopButton } from '@/components/back-to-top-button';
 import { colors } from '@/theme';
 
 type Props = PropsWithChildren<{
@@ -10,20 +11,42 @@ type Props = PropsWithChildren<{
 }>;
 
 export function Screen({ children, refreshing = false, onRefresh, header }: Props) {
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const [atPageEnd, setAtPageEnd] = useState(false);
+
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const nextShowBackToTop = contentOffset.y > 320;
+    const nextAtPageEnd = nextShowBackToTop
+      && contentOffset.y + layoutMeasurement.height >= contentSize.height - 40;
+
+    setShowBackToTop((current) => current === nextShowBackToTop ? current : nextShowBackToTop);
+    setAtPageEnd((current) => current === nextAtPageEnd ? current : nextAtPageEnd);
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  }, []);
+
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       {header ? <View style={styles.header}><View style={styles.headerInner}>{header}</View></View> : null}
       <View pointerEvents="none" style={styles.decorOne} />
       <View pointerEvents="none" style={styles.decorTwo} />
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={32}
         refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primaryDark} colors={[colors.primaryDark]} /> : undefined}
       >
         {children}
       </ScrollView>
+      <BackToTopButton visible={showBackToTop} atPageEnd={atPageEnd} onPress={scrollToTop} />
     </SafeAreaView>
   );
 }

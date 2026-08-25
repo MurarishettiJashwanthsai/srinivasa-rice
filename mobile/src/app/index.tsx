@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { AccessibilityInfo, Animated, Image, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, Image, Platform, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActionButton } from '@/components/action-button';
 import { AnimatedReveal } from '@/components/animated-reveal';
+import { BackToTopButton } from '@/components/back-to-top-button';
 import { SITE_URL } from '@/config';
 import { colors, radii, shadows } from '@/theme';
 
@@ -15,6 +16,9 @@ const features = [
 ] as const;
 
 export default function WelcomeScreen() {
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const [atPageEnd, setAtPageEnd] = useState(false);
   const logoProgress = useRef(new Animated.Value(0)).current;
   const copyProgress = useRef(new Animated.Value(0)).current;
   const actionProgress = useRef(new Animated.Value(0)).current;
@@ -59,6 +63,20 @@ export default function WelcomeScreen() {
 
   const enterApp = () => router.replace('/(tabs)');
 
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const nextShowBackToTop = contentOffset.y > 320;
+    const nextAtPageEnd = nextShowBackToTop
+      && contentOffset.y + layoutMeasurement.height >= contentSize.height - 40;
+
+    setShowBackToTop((current) => current === nextShowBackToTop ? current : nextShowBackToTop);
+    setAtPageEnd((current) => current === nextAtPageEnd ? current : nextAtPageEnd);
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  }, []);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <StatusBar style="light" />
@@ -70,7 +88,7 @@ export default function WelcomeScreen() {
         <Text style={styles.grainTwo}>✦</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={32}>
         <View style={styles.topRow}>
           <Text style={styles.location}>MIRYALAGUDA • TELANGANA</Text>
           <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE DATA</Text></View>
@@ -131,6 +149,7 @@ export default function WelcomeScreen() {
           <Text style={styles.securityNote}>SECURE • ADMIN-SYNCED • CUSTOMER-FOCUSED</Text>
         </Animated.View>
       </ScrollView>
+      <BackToTopButton visible={showBackToTop} atPageEnd={atPageEnd} onPress={scrollToTop} />
     </SafeAreaView>
   );
 }
