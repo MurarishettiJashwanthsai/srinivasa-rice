@@ -1,6 +1,12 @@
 name: Weekly live-site audit
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/weekly-site-audit.yml
+      - frontend/scripts/check-live-links.mjs
   schedule:
     - cron: '0 22 * * 0'
   workflow_dispatch:
