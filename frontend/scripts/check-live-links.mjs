@@ -1,4 +1,13 @@
 const siteUrl = (process.env.SITE_URL || 'https://www.srinivascanvassing.com').replace(/\/$/, '');
+const canonicalProductSlugs = new Map([
+    ['jsr-steem-rice', 'jsr-steam-rice'],
+]);
+
+const canonicalProductUrl = (product) => {
+    const slug = String(product?.slug || '').trim().toLowerCase();
+    const canonicalSlug = canonicalProductSlugs.get(slug) || slug;
+    return `${siteUrl}/products/${canonicalSlug}`;
+};
 
 const fetchChecked = async (url, options = {}) => {
     const response = await fetch(url, { redirect: 'follow', ...options });
@@ -15,8 +24,9 @@ if (!urls.some((url) => url.includes('/products/'))) throw new Error('The sitema
 
 const productsResponse = await fetchChecked(`${siteUrl}/api/products`);
 const products = await productsResponse.json();
+if (!Array.isArray(products)) throw new Error('The products API did not return a list');
 for (const product of products) {
-    const productUrl = `${siteUrl}/products/${product.slug}`;
+    const productUrl = canonicalProductUrl(product);
     if (!urls.includes(productUrl)) throw new Error(`Published product is missing from sitemap: ${productUrl}`);
 }
 
