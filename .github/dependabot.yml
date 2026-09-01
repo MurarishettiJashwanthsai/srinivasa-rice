@@ -5,12 +5,20 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # Version 1 removes icon aliases currently used by the production UI.
+      - dependency-name: lucide-react
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: npm
     directory: /mobile
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # React Native is pinned by the installed Expo SDK and must be upgraded with Expo.
+      - dependency-name: react-native
 
   - package-ecosystem: pip
     directory: /backend

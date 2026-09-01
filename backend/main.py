@@ -663,6 +663,40 @@ async def get_admin_login_history(
     events = db.query(AdminLoginHistory).order_by(AdminLoginHistory.id.desc()).limit(100).all()
     return events
 
+
+@app.get("/api/admin/integrations")
+async def get_admin_integration_status(_: str = Depends(get_current_user)):
+    """Expose configuration readiness to admins without returning secret values."""
+    lead_webhook_configured = bool(os.getenv("LEAD_NOTIFICATION_WEBHOOK_URL", "").strip())
+    confirmation_webhook_configured = bool(os.getenv("CUSTOMER_CONFIRMATION_WEBHOOK_URL", "").strip())
+    cloudinary_configured = all(
+        os.getenv(name, "").strip()
+        for name in ("CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET")
+    )
+    return {
+        "lead_notifications": {
+            "configured": lead_webhook_configured,
+            "status": "ready" if lead_webhook_configured else "action_required",
+        },
+        "customer_confirmations": {
+            "configured": confirmation_webhook_configured,
+            "status": "ready" if confirmation_webhook_configured else "action_required",
+        },
+        "turnstile": {
+            "configured": bool(TURNSTILE_SECRET_KEY),
+            "required": TURNSTILE_REQUIRED,
+            "status": "ready" if TURNSTILE_SECRET_KEY else "action_required",
+        },
+        "cloudinary": {
+            "configured": cloudinary_configured,
+            "status": "ready" if cloudinary_configured else "action_required",
+        },
+        "admin_password_hash": {
+            "configured": bool(ADMIN_PASSWORD_HASH),
+            "status": "ready" if ADMIN_PASSWORD_HASH else "action_required",
+        },
+    }
+
 @app.get("/api/products")
 async def get_products(db: Session = Depends(get_db)):
     products = db.query(RicePrice).filter(RicePrice.status == "published").order_by(RicePrice.id.asc()).all()

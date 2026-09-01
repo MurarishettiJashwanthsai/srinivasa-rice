@@ -161,6 +161,28 @@ def test_hashed_admin_password_verification(monkeypatch):
     assert main_module.verify_admin_password("incorrect password") is False
 
 
+def test_admin_integration_status_is_protected_and_never_exposes_secrets():
+    client.cookies.clear()
+    assert client.get("/api/admin/integrations").status_code == 401
+    assert login_admin().status_code == 200
+
+    response = client.get("/api/admin/integrations")
+    assert response.status_code == 200
+    payload = response.json()
+    assert set(payload) == {
+        "lead_notifications",
+        "customer_confirmations",
+        "turnstile",
+        "cloudinary",
+        "admin_password_hash",
+    }
+    for integration in payload.values():
+        assert isinstance(integration["configured"], bool)
+        assert integration["status"] in {"ready", "action_required"}
+        assert "secret" not in integration
+        assert "url" not in integration
+
+
 def test_production_admin_mutations_require_trusted_origin(monkeypatch):
     monkeypatch.setattr(main_module, "IS_PRODUCTION", True)
     rejected = client.post(

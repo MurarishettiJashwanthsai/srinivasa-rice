@@ -69,3 +69,5 @@ npx eas-cli@latest update --channel preview --message "Describe the app change" 
 After publishing, fully close and reopen the installed app. The first launch downloads a compatible update; reopen it once more if the change has not yet appeared. Native dependency, permission, icon, splash-screen or runtime changes always require a new build.
 
 Before store submission, provide final App Store and Play Store listing text, screenshots, privacy declarations, support URL and an approved square 1024×1024 brand icon.
+
+Follow [STORE_RELEASE_CHECKLIST.md](./STORE_RELEASE_CHECKLIST.md) for the complete production-build, internal-testing and store-submission sequence.

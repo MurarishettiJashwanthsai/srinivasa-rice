@@ -22,6 +22,7 @@ const AdminDashboard = () => {
     const [expandedInquiry, setExpandedInquiry] = useState(null);
     const [adminSessions, setAdminSessions] = useState([]);
     const [loginHistory, setLoginHistory] = useState([]);
+    const [integrationStatus, setIntegrationStatus] = useState(null);
     const [securityLoading, setSecurityLoading] = useState(false);
 
     const navigate = useNavigate();
@@ -75,16 +76,18 @@ const AdminDashboard = () => {
     const fetchSecurityActivity = useCallback(async () => {
         setSecurityLoading(true);
         try {
-            const [sessionsResponse, historyResponse] = await Promise.all([
+            const [sessionsResponse, historyResponse, integrationsResponse] = await Promise.all([
                 adminFetch('/api/admin/sessions'),
                 adminFetch('/api/admin/login-history'),
+                adminFetch('/api/admin/integrations'),
             ]);
-            if (sessionsResponse.status === 401 || historyResponse.status === 401) {
+            if ([sessionsResponse, historyResponse, integrationsResponse].some((response) => response.status === 401)) {
                 navigate('/admin/login');
                 return;
             }
             if (sessionsResponse.ok) setAdminSessions(await sessionsResponse.json());
             if (historyResponse.ok) setLoginHistory(await historyResponse.json());
+            if (integrationsResponse.ok) setIntegrationStatus(await integrationsResponse.json());
         } catch {
             toast.error('Unable to load admin security activity');
         } finally {
@@ -299,6 +302,21 @@ const AdminDashboard = () => {
 
                 {activeTab === 'inventory' && (
                     <>
+                        {products.some((product) => !product.image_url) && (
+                            <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-amber-800 dark:text-amber-200">
+                                <div className="flex items-start gap-3">
+                                    <ImagePlus className="mt-0.5 h-5 w-5 flex-none" />
+                                    <div>
+                                        <h2 className="font-display font-bold">Product images required</h2>
+                                        <p className="mt-1 text-sm font-medium">
+                                            {products.filter((product) => !product.image_url).map((product) => product.variety_name.trim()).join(', ')}
+                                        </p>
+                                        <p className="mt-2 text-xs font-semibold opacity-80">Use the Upload control in each product’s Image column. Existing product and rate data will remain unchanged.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Add Product */}
                         <div className="premium-card rounded-2xl p-6 mb-8">
                             <h2 className="text-lg font-display font-bold text-text-main dark:text-white mb-4 flex items-center gap-2"><Plus className="w-5 h-5 text-primary" />Add New Variety</h2>
@@ -571,6 +589,30 @@ const AdminDashboard = () => {
                                 <button type="button" onClick={fetchSecurityActivity} disabled={securityLoading} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60">
                                     <RefreshCw className={`w-4 h-4 ${securityLoading ? 'animate-spin' : ''}`} /> Refresh
                                 </button>
+                            </div>
+                        </div>
+
+                        <div className="premium-card rounded-2xl overflow-hidden">
+                            <div className="p-5 border-b border-border dark:border-white/10">
+                                <h3 className="font-display font-bold text-text-main dark:text-white">Production Integration Readiness</h3>
+                                <p className="text-xs text-text-muted mt-1">Configuration status only. Secret values are never returned to the browser.</p>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 p-5">
+                                {[
+                                    ['Staff enquiry alerts', integrationStatus?.lead_notifications],
+                                    ['Customer confirmations', integrationStatus?.customer_confirmations],
+                                    ['Turnstile protection', integrationStatus?.turnstile],
+                                    ['Cloudinary images', integrationStatus?.cloudinary],
+                                    ['Hashed admin password', integrationStatus?.admin_password_hash],
+                                ].map(([label, integration]) => (
+                                    <div key={label} className="rounded-xl border border-border dark:border-white/10 bg-surface-hover/30 p-4">
+                                        <div className={`mb-2 h-2.5 w-2.5 rounded-full ${integration?.configured ? 'bg-emerald' : 'bg-amber-500'}`} />
+                                        <p className="text-sm font-bold text-text-main dark:text-white">{label}</p>
+                                        <p className={`mt-1 text-xs font-bold ${integration?.configured ? 'text-emerald' : 'text-amber-600 dark:text-amber-300'}`}>
+                                            {integration ? (integration.configured ? 'Ready' : 'Action required') : 'Checking…'}
+                                        </p>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
