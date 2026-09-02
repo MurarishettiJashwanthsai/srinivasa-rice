@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
 import cloudinary
+import cloudinary.uploader
 import httpx
 from dotenv import load_dotenv
 from passlib.hash import pbkdf2_sha256
