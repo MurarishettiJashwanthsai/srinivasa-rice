@@ -487,7 +487,14 @@ async def login(
             detail=configuration_error,
         )
 
-    if login_is_locked(db, username, request):
+    credentials_valid = (
+        hmac.compare_digest(username, ADMIN_USERNAME)
+        and verify_admin_password(password)
+    )
+
+    # Keep rate limiting for incorrect credentials without locking the legitimate
+    # administrator out after they correct a typo or reset their password.
+    if not credentials_valid and login_is_locked(db, username, request):
         record_login_event(
             db,
             username=username,
@@ -500,11 +507,6 @@ async def login(
             detail=f"Too many failed sign-in attempts. Try again in {LOGIN_LOCKOUT_MINUTES} minutes.",
             headers={"Retry-After": str(LOGIN_LOCKOUT_MINUTES * 60)},
         )
-
-    credentials_valid = (
-        hmac.compare_digest(username, ADMIN_USERNAME)
-        and verify_admin_password(password)
-    )
 
     if credentials_valid:
         now = utc_now()

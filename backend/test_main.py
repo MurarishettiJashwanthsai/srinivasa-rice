@@ -426,3 +426,23 @@ def test_login_rate_limit_and_temporary_lockout():
     )
     assert blocked.status_code == 429
     assert "Retry-After" in blocked.headers
+
+
+def test_correct_credentials_are_not_blocked_after_failed_attempts():
+    request_headers = {"x-forwarded-for": f"test-{uuid.uuid4().hex}"}
+    invalid_username = f"invalid-{uuid.uuid4().hex}@example.test"
+    for _ in range(5):
+        response = client.post(
+            "/api/admin/login",
+            data={"username": invalid_username, "password": "incorrect-password"},
+            headers=request_headers,
+        )
+        assert response.status_code == 401
+
+    successful = client.post(
+        "/api/admin/login",
+        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]},
+        headers=request_headers,
+    )
+    assert successful.status_code == 200
+    assert successful.json()["authenticated"] is True
