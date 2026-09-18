@@ -9,10 +9,22 @@ const canonicalProductUrl = (product) => {
     return `${siteUrl}/products/${canonicalSlug}`;
 };
 
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
 const fetchChecked = async (url, options = {}) => {
-    const response = await fetch(url, { redirect: 'follow', ...options });
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${url}`);
-    return response;
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+            const response = await fetch(url, { redirect: 'follow', ...options });
+            if (response.ok) return response;
+            lastError = new Error(`${response.status} ${response.statusText}: ${url}`);
+            if (response.status < 500) break;
+        } catch (error) {
+            lastError = error;
+        }
+        if (attempt < 3) await wait(attempt * 1000);
+    }
+    throw lastError;
 };
 
 const sitemapResponse = await fetchChecked(`${siteUrl}/sitemap.xml`);

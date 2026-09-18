@@ -78,4 +78,6 @@ jobs:
         run: npm run typecheck
       - name: Validate Expo configuration
         working-directory: mobile
-        run: npx expo-doctor@latest
+        # Use the lockfile-pinned doctor so a future upstream release cannot
+        # make an unchanged, valid mobile build start failing unexpectedly.
+        run: npx expo-doctor
