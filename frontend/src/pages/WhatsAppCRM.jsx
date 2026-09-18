@@ -21,6 +21,7 @@ const WhatsAppCRM = () => {
         browserNotificationPermission,
         clearUnreadInquiries,
         enableBrowserNotifications,
+        notificationSoundReady,
         processLeadUpdate,
         unreadInquiryCount,
     } = useInquiryNotifications();
@@ -113,10 +114,12 @@ const WhatsAppCRM = () => {
                         type="button"
                         onClick={enableBrowserNotifications}
                         className="relative flex items-center gap-2 px-5 py-3 rounded-xl bg-primary/10 text-primary font-black text-xs uppercase tracking-widest border border-primary/20 hover:bg-primary/20 transition-all"
-                        title="Enable browser alerts for newly received inquiries"
+                        title="Enable sounds and browser alerts for new or contacted inquiries"
                     >
-                        {browserNotificationPermission === 'granted' ? <BellRing className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
-                        {browserNotificationPermission === 'granted' ? 'Notifications On' : 'Enable Notifications'}
+                        {browserNotificationPermission === 'granted' || notificationSoundReady ? <BellRing className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+                        {browserNotificationPermission === 'granted' && notificationSoundReady
+                            ? 'Sound & Alerts On'
+                            : notificationSoundReady ? 'Sound On' : 'Enable Sound & Alerts'}
                         {unreadInquiryCount > 0 && (
                             <span className="min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
                                 {unreadInquiryCount}

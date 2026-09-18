@@ -30,7 +30,9 @@ const AdminDashboard = () => {
     const {
         browserNotificationPermission,
         clearUnreadInquiries,
+        confirmLeadContacted,
         enableBrowserNotifications,
+        notificationSoundReady,
         processLeadUpdate,
         unreadInquiryCount,
     } = useInquiryNotifications();
@@ -125,6 +127,7 @@ const AdminDashboard = () => {
     };
 
     const updateLeadStatus = async (leadId, nextStatus) => {
+        const previousStatus = leads.find((lead) => lead.id === leadId)?.status || 'new';
         const response = await adminFetch(`/api/leads/${leadId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -133,7 +136,12 @@ const AdminDashboard = () => {
         if (response.ok) {
             const updatedLead = await response.json();
             setLeads((current) => current.map((lead) => lead.id === leadId ? updatedLead : lead));
-            toast.success('Inquiry status updated');
+            if (previousStatus !== 'contacted' && updatedLead.status === 'contacted') {
+                confirmLeadContacted(updatedLead);
+                toast.success('Inquiry marked as contacted');
+            } else {
+                toast.success('Inquiry status updated');
+            }
         } else if (response.status === 401) {
             navigate('/admin/login');
         } else {
@@ -272,10 +280,12 @@ const AdminDashboard = () => {
                             type="button"
                             onClick={enableBrowserNotifications}
                             className="relative flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary font-semibold text-sm border border-primary/20 hover:bg-primary/20 transition-all"
-                            title="Enable browser alerts for newly received inquiries"
+                            title="Enable sounds and browser alerts for new or contacted inquiries"
                         >
-                            {browserNotificationPermission === 'granted' ? <BellRing className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
-                            {browserNotificationPermission === 'granted' ? 'Notifications On' : 'Enable Notifications'}
+                            {browserNotificationPermission === 'granted' || notificationSoundReady ? <BellRing className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+                            {browserNotificationPermission === 'granted' && notificationSoundReady
+                                ? 'Sound & Alerts On'
+                                : notificationSoundReady ? 'Sound On' : 'Enable Sound & Alerts'}
                             {unreadInquiryCount > 0 && (
                                 <span className="min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center">
                                     {unreadInquiryCount}
