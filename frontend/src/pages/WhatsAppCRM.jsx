@@ -10,6 +10,15 @@ import { adminFetch } from '../utils/adminApi';
 
 const API = API_BASE_URL;
 
+const notificationLabel = (status) => ({
+    delivered: 'Staff alert sent',
+    failed: 'Webhook failed',
+    not_configured: 'Not configured',
+    pending: 'Pending',
+    filtered: 'Filtered',
+    legacy: 'Legacy record',
+}[status] || status || 'Legacy record');
+
 const WhatsAppCRM = () => {
     const [activeTab, setActiveTab] = useState('conversations');
     const [leads, setLeads] = useState([]);
@@ -94,7 +103,7 @@ const WhatsAppCRM = () => {
             { label: 'Total Contacts', value: leads.length, icon: Users, color: 'text-primary' },
             { label: 'This Month', value: leads.filter(l => new Date(l.created_at) > monthAgoTimestamp).length, icon: Clock, color: 'text-emerald-500' },
             { label: 'Subscribers', value: leads.filter(l => l.inquiry_text?.includes('Price Alert')).length, icon: Tag, color: 'text-primary' },
-            { label: 'Notifications Sent', value: leads.filter(l => l.notification_status === 'delivered').length, icon: Send, color: 'text-emerald-500' },
+            { label: 'Staff Alerts Sent', value: leads.filter(l => l.notification_status === 'delivered').length, icon: Send, color: 'text-emerald-500' },
         ];
     }, [leads]);
 
@@ -191,7 +200,7 @@ const WhatsAppCRM = () => {
                                                     <th className="py-6 px-8">Organization</th>
                                                     <th className="py-6 px-8">Direct Access</th>
                                                     <th className="py-6 px-8">Interaction Date</th>
-                                                    <th className="py-6 px-8">Notification</th>
+                                                    <th className="py-6 px-8" title="Delivery through the configured staff webhook; browser sound is controlled separately above.">Staff Alert Delivery</th>
                                                     <th className="py-6 px-8 text-center">Protocol</th>
                                                 </tr>
                                             </thead>
@@ -226,7 +235,7 @@ const WhatsAppCRM = () => {
                                                                         ? 'bg-red-500/10 text-red-500'
                                                                         : 'bg-primary/10 text-primary'
                                                             }`}>
-                                                                {lead.notification_status || 'legacy'}
+                                                                {notificationLabel(lead.notification_status)}
                                                             </span>
                                                         </td>
                                                         <td className="py-6 px-8 text-center">

@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 const LAST_NOTIFIED_LEAD_KEY = 'crm_last_notified_lead_id';
 const KNOWN_LEAD_STATUSES_KEY = 'crm_known_lead_statuses';
 const KNOWN_UNREAD_MESSAGES_KEY = 'crm_known_unread_customer_messages';
+const SOUND_PREFERENCE_KEY = 'crm_notification_sound_enabled';
 
 let notificationAudioContext;
 
@@ -11,7 +12,9 @@ const getNotificationAudioContext = () => {
     if (typeof window === 'undefined') return null;
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return null;
-    if (!notificationAudioContext) notificationAudioContext = new AudioContextClass();
+    if (!notificationAudioContext || notificationAudioContext.state === 'closed') {
+        notificationAudioContext = new AudioContextClass();
+    }
     return notificationAudioContext;
 };
 
@@ -29,40 +32,63 @@ const unlockNotificationAudio = async () => {
 };
 
 const playNotificationSound = async (type) => {
-    if (!await unlockNotificationAudio()) return;
+    try {
+        if (!await unlockNotificationAudio()) return false;
 
-    const audioContext = getNotificationAudioContext();
-    const notes = type === 'contacted'
-        ? [
-            { frequency: 659.25, offset: 0, duration: 0.1 },
-            { frequency: 783.99, offset: 0.12, duration: 0.1 },
-            { frequency: 987.77, offset: 0.24, duration: 0.18 },
-        ]
-        : type === 'reply' ? [
-            { frequency: 523.25, offset: 0, duration: 0.12 },
-            { frequency: 659.25, offset: 0.14, duration: 0.12 },
-            { frequency: 783.99, offset: 0.28, duration: 0.2 },
-        ] : [
-            { frequency: 880, offset: 0, duration: 0.14 },
-            { frequency: 1174.66, offset: 0.18, duration: 0.22 },
-        ];
+        const audioContext = getNotificationAudioContext();
+        const notes = type === 'contacted'
+            ? [
+                { frequency: 659.25, offset: 0, duration: 0.1 },
+                { frequency: 783.99, offset: 0.12, duration: 0.1 },
+                { frequency: 987.77, offset: 0.24, duration: 0.18 },
+            ]
+            : type === 'reply' ? [
+                { frequency: 523.25, offset: 0, duration: 0.12 },
+                { frequency: 659.25, offset: 0.14, duration: 0.12 },
+                { frequency: 783.99, offset: 0.28, duration: 0.2 },
+            ] : [
+                { frequency: 880, offset: 0, duration: 0.14 },
+                { frequency: 1174.66, offset: 0.18, duration: 0.22 },
+            ];
 
-    notes.forEach(({ frequency, offset, duration }) => {
-        const oscillator = audioContext.createOscillator();
-        const gain = audioContext.createGain();
-        const startAt = audioContext.currentTime + offset;
-        const endAt = startAt + duration;
+        notes.forEach(({ frequency, offset, duration }) => {
+            const oscillator = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            const startAt = audioContext.currentTime + offset;
+            const endAt = startAt + duration;
 
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(frequency, startAt);
-        gain.gain.setValueAtTime(0.0001, startAt);
-        gain.gain.exponentialRampToValueAtTime(0.16, startAt + 0.025);
-        gain.gain.exponentialRampToValueAtTime(0.0001, endAt);
-        oscillator.connect(gain);
-        gain.connect(audioContext.destination);
-        oscillator.start(startAt);
-        oscillator.stop(endAt);
-    });
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(frequency, startAt);
+            gain.gain.setValueAtTime(0.0001, startAt);
+            gain.gain.exponentialRampToValueAtTime(0.16, startAt + 0.025);
+            gain.gain.exponentialRampToValueAtTime(0.0001, endAt);
+            oscillator.connect(gain);
+            gain.connect(audioContext.destination);
+            oscillator.start(startAt);
+            oscillator.stop(endAt);
+        });
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+const readSoundPreference = () => {
+    if (typeof window === 'undefined') return false;
+    try {
+        return window.localStorage.getItem(SOUND_PREFERENCE_KEY) === 'true';
+    } catch {
+        return false;
+    }
+};
+
+const writeSoundPreference = (enabled) => {
+    if (typeof window === 'undefined') return;
+    try {
+        window.localStorage.setItem(SOUND_PREFERENCE_KEY, String(enabled));
+    } catch {
+        // Sound still works for the current page when storage is unavailable.
+    }
 };
 
 const readKnownLeadStatuses = () => {
@@ -112,12 +138,15 @@ export const useInquiryNotifications = () => {
     const knownUnreadMessagesRef = useRef({});
 
     useEffect(() => {
+        if (!readSoundPreference()) return undefined;
         const unlockAudio = () => {
             void unlockNotificationAudio().then(setSoundReady);
         };
+        const restoreExistingAudio = window.setTimeout(unlockAudio, 0);
         window.addEventListener('pointerdown', unlockAudio, { once: true });
         window.addEventListener('keydown', unlockAudio, { once: true });
         return () => {
+            window.clearTimeout(restoreExistingAudio);
             window.removeEventListener('pointerdown', unlockAudio);
             window.removeEventListener('keydown', unlockAudio);
         };
@@ -267,9 +296,9 @@ export const useInquiryNotifications = () => {
     }, [announceContactedLead]);
 
     const enableBrowserNotifications = useCallback(async () => {
-        const soundEnabled = await unlockNotificationAudio();
+        const soundEnabled = await playNotificationSound('new');
         setSoundReady(soundEnabled);
-        if (soundEnabled) void playNotificationSound('new');
+        writeSoundPreference(soundEnabled);
 
         if (typeof window === 'undefined' || !('Notification' in window)) {
             if (soundEnabled) toast.success('Inquiry notification sound enabled.');
@@ -278,14 +307,23 @@ export const useInquiryNotifications = () => {
             return;
         }
 
-        const nextPermission = await window.Notification.requestPermission();
-        setPermission(nextPermission);
-        if (nextPermission === 'granted') {
-            toast.success('Inquiry sound and browser notifications enabled.');
+        let nextPermission = window.Notification.permission;
+        try {
+            if (nextPermission === 'default') nextPermission = await window.Notification.requestPermission();
+            setPermission(nextPermission);
+        } catch {
+            nextPermission = 'unsupported';
+            setPermission('unsupported');
+        }
+
+        if (soundEnabled && nextPermission === 'granted') {
+            toast.success('Test sound played. Browser alerts are enabled.');
         } else if (soundEnabled) {
-            toast.success('Inquiry sound enabled. Browser pop-ups were not enabled.');
+            toast.success('Test sound played. Browser pop-up alerts remain blocked.');
+        } else if (nextPermission === 'granted') {
+            toast.error('Browser alerts are enabled, but this browser blocked audio. Check the tab and device sound settings.');
         } else {
-            toast.error('Browser notifications were not enabled.');
+            toast.error('Sound and browser alerts are blocked. Allow notifications and sound for this site, then try again.');
         }
     }, []);
 
