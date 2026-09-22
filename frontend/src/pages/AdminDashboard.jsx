@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../config/api';
 import useInquiryNotifications from '../hooks/useInquiryNotifications';
 import { RATE_UNIT_OPTIONS, getRateUnitShortLabel } from '../utils/rateUnits';
 import { adminFetch, signOutAdmin } from '../utils/adminApi';
+import InquiryConversation from '../components/InquiryConversation';
 
 const AdminDashboard = () => {
     const [activeTab, setActiveTab] = useState('inventory');
@@ -20,6 +21,7 @@ const AdminDashboard = () => {
     const [editUnit, setEditUnit] = useState('MT');
     const [inquirySearch, setInquirySearch] = useState('');
     const [expandedInquiry, setExpandedInquiry] = useState(null);
+    const [activeConversation, setActiveConversation] = useState(null);
     const [adminSessions, setAdminSessions] = useState([]);
     const [loginHistory, setLoginHistory] = useState([]);
     const [integrationStatus, setIntegrationStatus] = useState(null);
@@ -148,6 +150,11 @@ const AdminDashboard = () => {
             toast.error('Unable to update inquiry status');
         }
     };
+
+    const mergeConversationLead = useCallback((updatedLead) => {
+        if (!updatedLead) return;
+        setLeads((current) => current.map((lead) => lead.id === updatedLead.id ? updatedLead : lead));
+    }, []);
 
     const generateBroadcast = () => {
         const date = new Date().toLocaleDateString('en-IN');
@@ -567,7 +574,15 @@ const AdminDashboard = () => {
                                             </div>
 
                                             {/* Quick action */}
-                                            <div className="flex-shrink-0">
+                                            <div className="flex flex-shrink-0 flex-col gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveConversation(activeConversation === lead.id ? null : lead.id)}
+                                                    className="relative flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-black text-white transition-all hover:bg-primary-dark whitespace-nowrap"
+                                                >
+                                                    <MessageSquare className="h-4 w-4" /> {activeConversation === lead.id ? 'Close Chat' : 'Open Chat'}
+                                                    {lead.unread_customer_messages > 0 && <span className="ml-1 min-w-5 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">{lead.unread_customer_messages}</span>}
+                                                </button>
                                                 <a
                                                     href={`https://wa.me/${lead.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello ${lead.name}, thank you for your inquiry about ${lead.inquiry_text?.slice(0, 60)}. We'd like to discuss further.`)}`}
                                                     target="_blank"
@@ -578,6 +593,7 @@ const AdminDashboard = () => {
                                                 </a>
                                             </div>
                                         </div>
+                                        {activeConversation === lead.id && <InquiryConversation lead={lead} onLeadUpdate={mergeConversationLead} />}
                                     </div>
                                 );
                             });

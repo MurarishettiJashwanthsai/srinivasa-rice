@@ -49,6 +49,7 @@ const Contact = () => {
     const [status, setStatus] = useState(null);
     const [rfqId, setRfqId] = useState(null);
     const [confirmationStatus, setConfirmationStatus] = useState('not_configured');
+    const [conversationUrl, setConversationUrl] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
     const [turnstileToken, setTurnstileToken] = useState('');
     const [turnstileResetKey, setTurnstileResetKey] = useState(0);
@@ -145,6 +146,7 @@ const Contact = () => {
                 }
                 setRfqId(data.request_id);
                 setConfirmationStatus(data.confirmation_status || 'not_configured');
+                setConversationUrl(data.conversation_url || '');
                 setStatus('success');
                 trackEvent('quote_form_success', {
                     request_id: data.request_id,
@@ -252,17 +254,25 @@ const Contact = () => {
                                             ? 'Your enquiry reference was also sent through the configured confirmation service.'
                                             : 'Please save the reference ID shown above for follow-up.'}
                                     </p>
-                                    <button
-                                        onClick={() => {
-                                            setStatus(null);
-                                            setFormData(prev => ({ ...prev, inquiry: '', client_submission_id: createSubmissionId() }));
-                                            setTurnstileToken('');
-                                            setTurnstileResetKey((value) => value + 1);
-                                        }}
-                                        className="button-primary !py-3 !px-8 text-sm"
-                                    >
-                                        Submit Another Request
-                                    </button>
+                                    <div className="flex flex-wrap justify-center gap-3">
+                                        {conversationUrl && (
+                                            <a href={conversationUrl} className="button-primary !py-3 !px-8 text-sm inline-flex items-center gap-2">
+                                                <MessageCircle className="h-4 w-4" /> Open Secure Conversation
+                                            </a>
+                                        )}
+                                        <button
+                                            onClick={() => {
+                                                setStatus(null);
+                                                setConversationUrl('');
+                                                setFormData(prev => ({ ...prev, inquiry: '', client_submission_id: createSubmissionId() }));
+                                                setTurnstileToken('');
+                                                setTurnstileResetKey((value) => value + 1);
+                                            }}
+                                            className="rounded-xl border border-primary/30 px-8 py-3 text-sm font-black text-primary"
+                                        >
+                                            Submit Another Request
+                                        </button>
+                                    </div>
                                 </div>
                             ) : (
                                 <form

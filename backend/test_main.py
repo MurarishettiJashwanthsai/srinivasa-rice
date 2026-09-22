@@ -12,7 +12,7 @@ from passlib.hash import pbkdf2_sha256
 import main as main_module
 from main import app
 from database import Base, engine, SessionLocal
-from models import RicePrice, Lead, LeadAuditLog, RateAuditLog, AdminSession, AdminLoginHistory
+from models import RicePrice, Lead, LeadAuditLog, LeadMessage, RateAuditLog, AdminSession, AdminLoginHistory
 
 from migrate_db import run_migration
 
@@ -299,6 +299,76 @@ def test_admin_can_update_inquiry_status_with_audit_history():
             db.query(Lead).filter(Lead.id == lead_id).delete()
             db.commit()
         db.close()
+
+
+def test_secure_enquiry_conversation_supports_customer_and_custom_admin_replies(monkeypatch):
+    monkeypatch.setenv("LEAD_NOTIFICATION_WEBHOOK_URL", "")
+    monkeypatch.setenv("CUSTOMER_CONFIRMATION_WEBHOOK_URL", "")
+    assert login_admin().status_code == 200
+    request_id = f"RFQ-CHAT-{uuid.uuid4().hex[:8].upper()}"
+    db = SessionLocal()
+    lead_id = None
+    try:
+        lead = Lead(
+            request_id=request_id,
+            name="Conversation Customer",
+            company="Conversation Imports",
+            email="conversation@example.test",
+            whatsapp="+919999999997",
+            inquiry_text="Please discuss this requirement securely.",
+            status="new",
+            source_page="contact",
+            privacy_consent=True,
+            created_at=main_module.iso_utc(),
+        )
+        db.add(lead)
+        db.commit()
+        db.refresh(lead)
+        lead_id = lead.id
+        token = main_module.create_conversation_token(lead)
+
+        public_reply = client.post(
+            "/api/conversations/messages",
+            json={"body": "Can you confirm availability for next month?"},
+            headers={"Authorization": f"Bearer {token}", "x-forwarded-for": f"chat-{uuid.uuid4().hex}"},
+        )
+        assert public_reply.status_code == 200
+        assert public_reply.json()["sender"] == "customer"
+        assert public_reply.json()["notification_status"] == "not_configured"
+
+        lead_list = client.get("/api/leads")
+        listed_lead = next(item for item in lead_list.json() if item["id"] == lead_id)
+        assert listed_lead["unread_customer_messages"] == 1
+
+        admin_view = client.get(f"/api/leads/{lead_id}/messages")
+        assert admin_view.status_code == 200
+        assert admin_view.json()["lead"]["unread_customer_messages"] == 0
+        assert admin_view.json()["conversation_url"].startswith(f"{main_module.SITE_URL}/enquiry#")
+
+        admin_reply = client.post(
+            f"/api/leads/{lead_id}/messages",
+            json={"body": "Yes. Please confirm your preferred packaging.", "notify_customer": True},
+        )
+        assert admin_reply.status_code == 200
+        assert admin_reply.json()["message"]["sender"] == "admin"
+        assert admin_reply.json()["message"]["notification_status"] == "not_configured"
+        assert admin_reply.json()["lead"]["status"] == "contacted"
+
+        customer_view = client.get("/api/conversations", headers={"Authorization": f"Bearer {token}"})
+        assert customer_view.status_code == 200
+        assert [message["sender"] for message in customer_view.json()["messages"]] == ["customer", "admin"]
+        assert customer_view.json()["messages"][-1]["read_by_customer_at"] is not None
+    finally:
+        if lead_id is not None:
+            db.query(LeadMessage).filter(LeadMessage.lead_id == lead_id).delete()
+            db.query(LeadAuditLog).filter(LeadAuditLog.lead_id == lead_id).delete()
+            db.query(Lead).filter(Lead.id == lead_id).delete()
+            db.commit()
+        db.close()
+
+
+def test_conversation_rejects_invalid_links_and_empty_messages():
+    assert client.get("/api/conversations", headers={"Authorization": "Bearer not-a-valid-token"}).status_code == 401
 
 
 def test_contact_submission_id_prevents_duplicate_enquiries():

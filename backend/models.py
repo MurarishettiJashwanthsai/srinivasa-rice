@@ -97,6 +97,22 @@ class LeadAuditLog(Base):
     timestamp: Mapped[str] = mapped_column(String, nullable=False)
 
 
+class LeadMessage(Base):
+    """A customer/admin message attached to an existing genuine enquiry."""
+    __tablename__ = "lead_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    lead_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    sender: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    read_by_admin_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    read_by_customer_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    notification_status: Mapped[Optional[str]] = mapped_column(String, default="pending", nullable=True)
+    notification_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ip_fingerprint: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)
+
+
 class AdminSession(Base):
     __tablename__ = "admin_sessions"
 

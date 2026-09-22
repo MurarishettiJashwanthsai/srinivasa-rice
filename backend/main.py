@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 from passlib.hash import pbkdf2_sha256
 
 from database import engine, Base, get_db
-from models import RicePrice, Lead, LeadAuditLog, RateAuditLog, AdminSession, AdminLoginHistory
+from models import RicePrice, Lead, LeadAuditLog, LeadMessage, RateAuditLog, AdminSession, AdminLoginHistory
 
 load_dotenv()
 
@@ -65,6 +65,9 @@ TURNSTILE_REQUIRED = os.getenv("TURNSTILE_REQUIRED", "true" if IS_PRODUCTION els
 CONTACT_MAX_SUBMISSIONS = int(os.getenv("CONTACT_MAX_SUBMISSIONS", "5"))
 CONTACT_WINDOW_MINUTES = int(os.getenv("CONTACT_WINDOW_MINUTES", "15"))
 ALLOW_LOCAL_UPLOADS = os.getenv("ALLOW_LOCAL_UPLOADS", "false" if IS_PRODUCTION else "true").strip().lower() == "true"
+CONVERSATION_TOKEN_DAYS = int(os.getenv("CONVERSATION_TOKEN_DAYS", "30"))
+CONVERSATION_MAX_MESSAGES = int(os.getenv("CONVERSATION_MAX_MESSAGES", "20"))
+CONVERSATION_WINDOW_MINUTES = int(os.getenv("CONVERSATION_WINDOW_MINUTES", "15"))
 
 ALLOWED_RATE_UNITS = {
     "MT",
@@ -183,6 +186,79 @@ def public_product(product: RicePrice) -> dict:
         "moisture": product.moisture,
         "processing": product.processing,
     }
+
+
+def create_conversation_token(lead: Lead) -> str:
+    now = utc_now()
+    return jwt.encode(
+        {
+            "sub": str(lead.id),
+            "request_id": lead.request_id,
+            "purpose": "customer_conversation",
+            "iat": now,
+            "exp": now + datetime.timedelta(days=CONVERSATION_TOKEN_DAYS),
+        },
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+
+def get_conversation_lead(token: str, db: Session) -> Lead:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.ExpiredSignatureError as error:
+        raise HTTPException(status_code=401, detail="This conversation link has expired. Please contact our team for a new link.") from error
+    except jwt.PyJWTError as error:
+        raise HTTPException(status_code=401, detail="This conversation link is invalid") from error
+
+    if payload.get("purpose") != "customer_conversation":
+        raise HTTPException(status_code=401, detail="This conversation link is invalid")
+    try:
+        lead_id = int(payload.get("sub"))
+    except (TypeError, ValueError) as error:
+        raise HTTPException(status_code=401, detail="This conversation link is invalid") from error
+
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead or not hmac.compare_digest(str(payload.get("request_id") or ""), str(lead.request_id or "")):
+        raise HTTPException(status_code=404, detail="Enquiry conversation not found")
+    return lead
+
+
+def conversation_url(lead: Lead) -> str:
+    # Keep the bearer token in the URL fragment. Fragments are not sent to Vercel,
+    # Render, analytics, referrer headers, or ordinary access logs.
+    return f"{SITE_URL}/enquiry#{create_conversation_token(lead)}"
+
+
+def conversation_token_from_request(request: Request) -> str:
+    authorization = request.headers.get("authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        raise HTTPException(status_code=401, detail="A secure conversation link is required")
+    return token.strip()
+
+
+def serialize_message(message: LeadMessage) -> dict:
+    return {
+        "id": message.id,
+        "sender": message.sender,
+        "body": message.body,
+        "created_at": message.created_at,
+        "read_by_admin_at": message.read_by_admin_at,
+        "read_by_customer_at": message.read_by_customer_at,
+        "notification_status": message.notification_status,
+    }
+
+
+def serialize_lead(lead: Lead, db: Session) -> dict:
+    data = {column.name: getattr(lead, column.name) for column in Lead.__table__.columns}
+    data["unread_customer_messages"] = db.query(LeadMessage).filter(
+        LeadMessage.lead_id == lead.id,
+        LeadMessage.sender == "customer",
+        LeadMessage.read_by_admin_at.is_(None),
+    ).count()
+    data["message_count"] = db.query(LeadMessage).filter(LeadMessage.lead_id == lead.id).count()
+    return data
 
 
 def record_login_event(
@@ -371,7 +447,7 @@ async def apply_api_security_headers(request: Request, call_next):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-    if request.url.path.startswith(("/api/admin", "/api/leads", "/api/contact")):
+    if request.url.path.startswith(("/api/admin", "/api/leads", "/api/contact", "/api/conversations")):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -467,6 +543,20 @@ class LeadUpdate(BaseModel):
     status: Optional[str] = None
     follow_up_at: Optional[str] = None
     internal_notes: Optional[str] = None
+
+
+class ConversationMessageCreate(BaseModel):
+    body: str
+    notify_customer: Optional[bool] = True
+
+
+def validate_conversation_message(body: str) -> str:
+    normalized = body.strip()
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Enter a message before sending")
+    if len(normalized) > 2_000:
+        raise HTTPException(status_code=400, detail="Messages must be 2,000 characters or fewer")
+    return normalized
 
 # --- Routes ---
 
@@ -1109,6 +1199,7 @@ async def handle_contact(
                 "request_id": existing_lead.request_id,
                 "notification_status": existing_lead.notification_status,
                 "confirmation_status": existing_lead.confirmation_status,
+                "conversation_url": conversation_url(existing_lead),
             }
 
     normalized_whatsapp = form_data.whatsapp.strip().replace(" ", "").replace("-", "")
@@ -1173,8 +1264,14 @@ async def handle_contact(
                             "product_name": new_lead.product_name,
                             "quantity_mt": new_lead.quantity_mt,
                             "quantity_unit": new_lead.quantity_unit,
+                            "inquiry": new_lead.inquiry_text,
                             "marketing_consent": new_lead.marketing_consent,
                             "created_at": new_lead.created_at,
+                            "message": (
+                                f"New website enquiry {request_id} from {new_lead.name} at {new_lead.company}. "
+                                f"Requirement: {new_lead.inquiry_text}"
+                            ),
+                            "admin_url": f"{SITE_URL}/admin",
                         },
                     )
                     notification_response.raise_for_status()
@@ -1206,6 +1303,7 @@ async def handle_contact(
                             "quantity": new_lead.quantity_mt,
                             "quantity_unit": new_lead.quantity_unit,
                             "message": f"Your Sri Srinivasa Canvassing enquiry reference is {request_id}.",
+                            "conversation_url": conversation_url(new_lead),
                         },
                     )
                     confirmation_response.raise_for_status()
@@ -1222,6 +1320,7 @@ async def handle_contact(
             "request_id": request_id,
             "notification_status": new_lead.notification_status,
             "confirmation_status": new_lead.confirmation_status,
+            "conversation_url": conversation_url(new_lead),
         }
     except IntegrityError as error:
         db.rollback()
@@ -1233,6 +1332,7 @@ async def handle_contact(
                     "request_id": existing_lead.request_id,
                     "notification_status": existing_lead.notification_status,
                     "confirmation_status": existing_lead.confirmation_status,
+                    "conversation_url": conversation_url(existing_lead),
                 }
         print(f"Lead integrity check failed: {error}")
         raise HTTPException(status_code=409, detail="This enquiry was already received. Please refresh and check your reference.") from error
@@ -1248,7 +1348,195 @@ async def get_leads(
 ):
     leads = db.query(Lead).order_by(Lead.id.desc()).all()
     # Preserve and return every genuine record. No demo identifiers are filtered here.
-    return leads
+    return [serialize_lead(lead, db) for lead in leads]
+
+
+@app.get("/api/conversations")
+async def get_customer_conversation(request: Request, db: Session = Depends(get_db)):
+    lead = get_conversation_lead(conversation_token_from_request(request), db)
+    read_at = iso_utc()
+    unread_admin_messages = db.query(LeadMessage).filter(
+        LeadMessage.lead_id == lead.id,
+        LeadMessage.sender == "admin",
+        LeadMessage.read_by_customer_at.is_(None),
+    ).all()
+    for message in unread_admin_messages:
+        message.read_by_customer_at = read_at
+    if unread_admin_messages:
+        db.commit()
+
+    messages = db.query(LeadMessage).filter(
+        LeadMessage.lead_id == lead.id,
+    ).order_by(LeadMessage.id.asc()).all()
+    return {
+        "request_id": lead.request_id,
+        "customer_name": lead.name,
+        "company": lead.company,
+        "product_name": lead.product_name,
+        "original_inquiry": lead.inquiry_text,
+        "status": lead.status,
+        "messages": [serialize_message(message) for message in messages],
+    }
+
+
+@app.post("/api/conversations/messages")
+async def create_customer_message(
+    payload: ConversationMessageCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    lead = get_conversation_lead(conversation_token_from_request(request), db)
+    body = validate_conversation_message(payload.body)
+    cutoff = iso_utc(utc_now() - datetime.timedelta(minutes=CONVERSATION_WINDOW_MINUTES))
+    fingerprint = client_ip_fingerprint(request)
+    recent_count = db.query(LeadMessage).filter(
+        LeadMessage.lead_id == lead.id,
+        LeadMessage.sender == "customer",
+        LeadMessage.ip_fingerprint == fingerprint,
+        LeadMessage.created_at >= cutoff,
+    ).count()
+    if recent_count >= CONVERSATION_MAX_MESSAGES:
+        raise HTTPException(status_code=429, detail="Too many messages were sent. Please wait a few minutes.")
+
+    message = LeadMessage(
+        lead_id=lead.id,
+        sender="customer",
+        body=body,
+        created_at=iso_utc(),
+        notification_status="pending",
+        ip_fingerprint=fingerprint,
+    )
+    lead.updated_at = message.created_at
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+
+    webhook_url = os.getenv("LEAD_NOTIFICATION_WEBHOOK_URL", "").strip()
+    if not webhook_url:
+        message.notification_status = "not_configured"
+    else:
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                response = await client.post(webhook_url, json={
+                    "event": "customer_reply",
+                    "request_id": lead.request_id,
+                    "name": lead.name,
+                    "company": lead.company,
+                    "email": lead.email,
+                    "whatsapp": lead.whatsapp,
+                    "message": body,
+                    "admin_url": f"{SITE_URL}/admin",
+                    "created_at": message.created_at,
+                })
+                response.raise_for_status()
+            message.notification_status = "delivered"
+            message.notification_error = None
+        except Exception as notification_error:
+            message.notification_status = "failed"
+            message.notification_error = str(notification_error)[:500]
+    db.commit()
+    return serialize_message(message)
+
+
+@app.get("/api/leads/{lead_id}/messages")
+async def get_admin_conversation(
+    lead_id: int,
+    current_user: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Inquiry not found")
+
+    read_at = iso_utc()
+    unread_customer_messages = db.query(LeadMessage).filter(
+        LeadMessage.lead_id == lead.id,
+        LeadMessage.sender == "customer",
+        LeadMessage.read_by_admin_at.is_(None),
+    ).all()
+    for message in unread_customer_messages:
+        message.read_by_admin_at = read_at
+    if unread_customer_messages:
+        db.commit()
+
+    messages = db.query(LeadMessage).filter(
+        LeadMessage.lead_id == lead.id,
+    ).order_by(LeadMessage.id.asc()).all()
+    return {
+        "lead": serialize_lead(lead, db),
+        "conversation_url": conversation_url(lead),
+        "messages": [serialize_message(message) for message in messages],
+    }
+
+
+@app.post("/api/leads/{lead_id}/messages")
+async def create_admin_message(
+    lead_id: int,
+    payload: ConversationMessageCreate,
+    current_user: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Inquiry not found")
+    body = validate_conversation_message(payload.body)
+    sent_at = iso_utc()
+    message = LeadMessage(
+        lead_id=lead.id,
+        sender="admin",
+        body=body,
+        created_at=sent_at,
+        read_by_admin_at=sent_at,
+        notification_status="pending" if payload.notify_customer else "not_requested",
+    )
+    old_status = lead.status
+    if lead.status == "new":
+        lead.status = "contacted"
+    lead.updated_at = sent_at
+    lead.updated_by = current_user
+    db.add(message)
+    db.add(LeadAuditLog(
+        lead_id=lead.id,
+        action="MESSAGE",
+        old_status=old_status,
+        new_status=lead.status,
+        admin_user=current_user,
+        details="Custom CRM reply sent",
+        timestamp=sent_at,
+    ))
+    db.commit()
+    db.refresh(message)
+
+    if payload.notify_customer:
+        webhook_url = os.getenv("CUSTOMER_CONFIRMATION_WEBHOOK_URL", "").strip()
+        if not webhook_url:
+            message.notification_status = "not_configured"
+        else:
+            try:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    response = await client.post(webhook_url, json={
+                        "event": "admin_message",
+                        "request_id": lead.request_id,
+                        "name": lead.name,
+                        "email": lead.email,
+                        "whatsapp": lead.whatsapp,
+                        "message": body,
+                        "conversation_url": conversation_url(lead),
+                        "created_at": sent_at,
+                    })
+                    response.raise_for_status()
+                message.notification_status = "delivered"
+                message.notification_error = None
+            except Exception as notification_error:
+                message.notification_status = "failed"
+                message.notification_error = str(notification_error)[:500]
+        db.commit()
+
+    return {
+        "message": serialize_message(message),
+        "lead": serialize_lead(lead, db),
+        "conversation_url": conversation_url(lead),
+    }
 
 
 @app.patch("/api/leads/{lead_id}")
@@ -1306,7 +1594,7 @@ async def update_lead(
     ))
     db.commit()
     db.refresh(lead)
-    return lead
+    return serialize_lead(lead, db)
 
 
 @app.get("/api/rate-audit-logs")

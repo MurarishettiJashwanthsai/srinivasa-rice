@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 
 const LAST_NOTIFIED_LEAD_KEY = 'crm_last_notified_lead_id';
 const KNOWN_LEAD_STATUSES_KEY = 'crm_known_lead_statuses';
+const KNOWN_UNREAD_MESSAGES_KEY = 'crm_known_unread_customer_messages';
 
 let notificationAudioContext;
 
@@ -37,7 +38,11 @@ const playNotificationSound = async (type) => {
             { frequency: 783.99, offset: 0.12, duration: 0.1 },
             { frequency: 987.77, offset: 0.24, duration: 0.18 },
         ]
-        : [
+        : type === 'reply' ? [
+            { frequency: 523.25, offset: 0, duration: 0.12 },
+            { frequency: 659.25, offset: 0.14, duration: 0.12 },
+            { frequency: 783.99, offset: 0.28, duration: 0.2 },
+        ] : [
             { frequency: 880, offset: 0, duration: 0.14 },
             { frequency: 1174.66, offset: 0.18, duration: 0.22 },
         ];
@@ -75,6 +80,21 @@ const writeKnownLeadStatuses = (statuses) => {
     window.localStorage.setItem(KNOWN_LEAD_STATUSES_KEY, JSON.stringify(statuses));
 };
 
+const readKnownUnreadMessages = () => {
+    if (typeof window === 'undefined') return {};
+    try {
+        const parsed = JSON.parse(window.localStorage.getItem(KNOWN_UNREAD_MESSAGES_KEY) || '{}');
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+        return {};
+    }
+};
+
+const writeKnownUnreadMessages = (counts) => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(KNOWN_UNREAD_MESSAGES_KEY, JSON.stringify(counts));
+};
+
 const getBrowserNotificationPermission = () => {
     if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
     return window.Notification.permission;
@@ -88,6 +108,8 @@ export const useInquiryNotifications = () => {
     const lastLeadIdRef = useRef(0);
     const statusesInitializedRef = useRef(false);
     const knownStatusesRef = useRef({});
+    const unreadMessagesInitializedRef = useRef(false);
+    const knownUnreadMessagesRef = useRef({});
 
     useEffect(() => {
         const unlockAudio = () => {
@@ -144,6 +166,36 @@ export const useInquiryNotifications = () => {
         }
     }, [permission]);
 
+    const announceCustomerReplies = useCallback((lead, count) => {
+        const customerLabel = lead.name || lead.company || lead.request_id || 'Customer';
+        toast.success(`${count === 1 ? 'New message' : `${count} new messages`} from ${customerLabel}`, { duration: 8000 });
+        setUnreadCount((current) => current + count);
+        void playNotificationSound('reply');
+        if (permission === 'granted') {
+            const browserNotification = new window.Notification('New customer reply', {
+                body: `${customerLabel} replied to enquiry ${lead.request_id || ''}. Open the protected CRM to respond.`,
+                icon: '/logo-256.png',
+                tag: `crm-reply-${lead.id}`,
+            });
+            browserNotification.onclick = () => window.focus();
+        }
+    }, [permission]);
+
+    const rememberUnreadMessages = useCallback((incomingLeads, announceChanges) => {
+        const nextCounts = { ...knownUnreadMessagesRef.current };
+        incomingLeads.forEach((lead) => {
+            const leadKey = String(lead.id);
+            const previousCount = Number(knownUnreadMessagesRef.current[leadKey]) || 0;
+            const nextCount = Number(lead.unread_customer_messages) || 0;
+            if (announceChanges && nextCount > previousCount) {
+                announceCustomerReplies(lead, nextCount - previousCount);
+            }
+            nextCounts[leadKey] = nextCount;
+        });
+        knownUnreadMessagesRef.current = nextCounts;
+        writeKnownUnreadMessages(nextCounts);
+    }, [announceCustomerReplies]);
+
     const rememberLeadStatuses = useCallback((incomingLeads, announceChanges) => {
         if (!Array.isArray(incomingLeads)) return;
 
@@ -174,6 +226,15 @@ export const useInquiryNotifications = () => {
             rememberLeadStatuses(incomingLeads, true);
         }
 
+        if (!unreadMessagesInitializedRef.current) {
+            knownUnreadMessagesRef.current = readKnownUnreadMessages();
+            const hasStoredCounts = Object.keys(knownUnreadMessagesRef.current).length > 0;
+            rememberUnreadMessages(incomingLeads, hasStoredCounts);
+            unreadMessagesInitializedRef.current = true;
+        } else {
+            rememberUnreadMessages(incomingLeads, true);
+        }
+
         const highestLeadId = Math.max(...incomingLeads.map((lead) => Number(lead.id) || 0));
         if (!initializedRef.current) {
             const storedLeadId = Number(localStorage.getItem(LAST_NOTIFIED_LEAD_KEY)) || 0;
@@ -191,7 +252,7 @@ export const useInquiryNotifications = () => {
             lastLeadIdRef.current = highestLeadId;
             localStorage.setItem(LAST_NOTIFIED_LEAD_KEY, String(highestLeadId));
         }
-    }, [announceNewLeads, rememberLeadStatuses]);
+    }, [announceNewLeads, rememberLeadStatuses, rememberUnreadMessages]);
 
     const confirmLeadContacted = useCallback((lead) => {
         if (!lead) return;

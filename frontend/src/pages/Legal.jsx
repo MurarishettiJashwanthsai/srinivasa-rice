@@ -51,12 +51,13 @@ const Legal = () => {
                                 <li>Registered Business Name</li>
                                 <li>Business Email Address and WhatsApp / Telephone Number</li>
                                 <li>Selected rice variety, quantity, quantity unit, packaging choice, and requirement details</li>
+                                <li>Messages exchanged through the secure enquiry conversation and their delivery/read status</li>
                                 <li>Separate records of enquiry-processing consent and optional WhatsApp marketing consent</li>
                                 <li>Technical anti-spam and security information, including an irreversible IP fingerprint for admin login protection</li>
                             </ul>
                             <h3 className="text-lg font-black text-text-main mt-6 mb-3">2. Purpose of Collection & Consent</h3>
                             <p>
-                                Necessary enquiry details are processed strictly to respond to your wholesale quote request. Optional marketing consent for daily WhatsApp market rate alerts requires an explicit, separate opt-in checkbox during form submission. You may withdraw your consent at any time by contacting us at <a href="mailto:srinivasulu@srinivascanvassing.com" className="text-primary hover:underline">srinivasulu@srinivascanvassing.com</a>.
+                                Necessary enquiry details and conversation messages are processed strictly to respond to your wholesale quote request. Optional marketing consent for daily WhatsApp market rate alerts requires an explicit, separate opt-in checkbox during form submission. Transactional notifications about an enquiry or a reply are separate from marketing messages. You may withdraw your marketing consent at any time by contacting us at <a href="mailto:srinivasulu@srinivascanvassing.com" className="text-primary hover:underline">srinivasulu@srinivascanvassing.com</a>.
                             </p>
                             <h3 className="text-lg font-black text-text-main mt-6 mb-3">3. Service Providers</h3>
                             <p>
@@ -64,7 +65,7 @@ const Legal = () => {
                             </p>
                             <h3 className="text-lg font-black text-text-main mt-6 mb-3">4. Data Retention & Access Control</h3>
                             <p>
-                                Inquiry records remain in the protected CRM while they are required to answer the request, maintain the business relationship, resolve disputes, or meet legal and accounting obligations. Records are not automatically deleted by the website. Authorized personnel periodically review records and archive or delete them only under an approved retention decision, preserving genuine enquiries unless removal is authorized.
+                                Inquiry records and their conversation history remain in the protected CRM while they are required to answer the request, maintain the business relationship, resolve disputes, or meet legal and accounting obligations. Customer conversation links are signed and time-limited. Records are not automatically deleted by the website. Authorized personnel periodically review records and archive or delete them only under an approved retention decision, preserving genuine enquiries unless removal is authorized.
                             </p>
                             <h3 className="text-lg font-black text-text-main mt-6 mb-3">5. Access, Correction, and Deletion Requests</h3>
                             <p>
@@ -72,7 +73,7 @@ const Legal = () => {
                             </p>
                             <h3 className="text-lg font-black text-text-main mt-6 mb-3">6. Cookies, Security, and Analytics</h3>
                             <p>
-                                Essential storage maintains preferences and secure admin sessions. When configured, Google Tag Manager measures page views, quote-form progress, successful or failed submissions, product quote selections, and WhatsApp button clicks. Analytics events exclude names, email addresses, telephone numbers, and free-text enquiries. Cloudflare Turnstile may process technical browser and network information to prevent automated submissions. We do not sell personal contact details or use third-party advertising cookies.
+                                Essential storage maintains preferences and secure admin sessions. When configured, Google Tag Manager measures page views, quote-form progress, successful or failed submissions, product quote selections, and WhatsApp button clicks. Analytics events exclude names, email addresses, telephone numbers, free-text enquiries, conversation messages, and secure conversation links. Analytics is not loaded on secure conversation or admin pages. Cloudflare Turnstile may process technical browser and network information to prevent automated submissions. We do not sell personal contact details or use third-party advertising cookies.
                             </p>
                         </div>
                     </section>

@@ -24,6 +24,7 @@ import StructuredData from './components/StructuredData';
 import ErrorBoundary from './components/ErrorBoundary';
 import Analytics from './components/Analytics';
 import MobileTurnstile from './pages/MobileTurnstile';
+import EnquiryConversation from './pages/EnquiryConversation';
 
 // Admin-only pages remain code split; public pages are synchronously renderable at build time.
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
@@ -56,13 +57,14 @@ const AdminPage = ({ children }) => (
 export function AppContent() {
     const location = useLocation();
     if (location.pathname === '/mobile-turnstile') return <MobileTurnstile />;
+    const isPrivateRoute = location.pathname.startsWith('/admin') || location.pathname === '/enquiry';
 
     return (
         <>
             <SkipLink />
             <ScrollToTop />
-            <StructuredData />
-            <Analytics />
+            {!isPrivateRoute && <StructuredData />}
+            {!isPrivateRoute && <Analytics />}
             <Toaster
                 position="top-right"
                 toastOptions={{
@@ -106,6 +108,7 @@ export function AppContent() {
                                         <Route path="/certifications" element={<Certifications />} />
                                         <Route path="/market-rates" element={<MarketDashboard />} />
                                         <Route path="/contact" element={<Contact />} />
+                                        <Route path="/enquiry" element={<EnquiryConversation />} />
                                         <Route path="/legal" element={<Legal />} />
                                     </Routes>
                                 </Suspense>

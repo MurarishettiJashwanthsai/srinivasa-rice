@@ -29,6 +29,32 @@
                     "value": "private, no-store, max-age=0"
                 }
             ]
+        },
+        {
+            "source": "/enquiry/:path*",
+            "headers": [
+                {
+                    "key": "X-Robots-Tag",
+                    "value": "noindex, nofollow, noarchive"
+                },
+                {
+                    "key": "Cache-Control",
+                    "value": "private, no-store, max-age=0"
+                }
+            ]
+        },
+        {
+            "source": "/enquiry",
+            "headers": [
+                {
+                    "key": "X-Robots-Tag",
+                    "value": "noindex, nofollow, noarchive"
+                },
+                {
+                    "key": "Cache-Control",
+                    "value": "private, no-store, max-age=0"
+                }
+            ]
         }
     ],
     "rewrites": [
@@ -46,6 +72,14 @@
         },
         {
             "source": "/card/:path*",
+            "destination": "/index.html"
+        },
+        {
+            "source": "/enquiry/:path*",
+            "destination": "/index.html"
+        },
+        {
+            "source": "/enquiry",
             "destination": "/index.html"
         },
         {
