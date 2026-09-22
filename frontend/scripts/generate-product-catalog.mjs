@@ -7,6 +7,38 @@ const frontendDirectory = resolve(scriptDirectory, '..');
 const outputFile = resolve(frontendDirectory, 'src/data/generatedProductCatalog.js');
 const productsApi = process.env.PRODUCTS_API_URL || 'https://srinivasa-rice.onrender.com/api/products';
 const allowFallback = process.env.ALLOW_STATIC_PRODUCT_FALLBACK === 'true';
+const maxFetchAttempts = 8;
+
+const wait = (milliseconds) => new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
+
+const fetchPublishedProducts = async () => {
+    let lastError;
+    for (let attempt = 1; attempt <= maxFetchAttempts; attempt += 1) {
+        try {
+            const response = await fetch(productsApi, {
+                headers: { Accept: 'application/json' },
+                signal: AbortSignal.timeout(12_000),
+            });
+            if (!response.ok) throw new Error(`Product API returned ${response.status}`);
+
+            const products = await response.json();
+            if (!Array.isArray(products) || products.length === 0) {
+                throw new Error('Product API returned no published products');
+            }
+            return products;
+        } catch (error) {
+            lastError = error;
+            if (attempt === maxFetchAttempts) break;
+            const retryDelay = Math.min(attempt * 5_000, 15_000);
+            console.warn(
+                `Product API attempt ${attempt}/${maxFetchAttempts} failed: ${error.message}. `
+                + `Retrying in ${retryDelay / 1_000}s...`,
+            );
+            await wait(retryDelay);
+        }
+    }
+    throw lastError;
+};
 
 const slugify = (value) => String(value || '')
     .toLowerCase()
@@ -21,16 +53,7 @@ const allowedFields = [
 ];
 
 try {
-    const response = await fetch(productsApi, {
-        headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(12_000),
-    });
-    if (!response.ok) throw new Error(`Product API returned ${response.status}`);
-
-    const products = await response.json();
-    if (!Array.isArray(products) || products.length === 0) {
-        throw new Error('Product API returned no published products');
-    }
+    const products = await fetchPublishedProducts();
 
     const normalizedProducts = products
         .filter((product) => product && product.status !== 'archived')
