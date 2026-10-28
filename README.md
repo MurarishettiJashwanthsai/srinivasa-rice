@@ -1,14 +1,13 @@
-# Sri Srinivasa Canvassing - Website, Admin and Mobile App
+# Sri Srinivasa Canvassing - Website and Admin
 
-This project contains the public B2B website, secure administration portal, FastAPI backend, and Expo React Native application for Android and iOS.
+This repository contains the public B2B website, secure administration portal, and FastAPI backend.
 
 ## Tech Stack
 - **Frontend**: React (Vite), React Router, Tailwind CSS v4, Lucide React (Icons).
 - **Backend**: Python 3, FastAPI, Uvicorn, Pydantic.
-- **Mobile**: Expo SDK 57, React Native, Expo Router and EAS Build.
 
 ## Prerequisites
-- Node.js 22.13 or newer for the Expo SDK 57 mobile app
+- Node.js 22 or newer
 - Python (v3.10+)
 
 ## Getting Started
@@ -69,24 +68,12 @@ npm run dev
 ```
 The React frontend will be accessible at `http://localhost:5173`. 
 
-### 3. Run the Android/iOS app
-
-```bash
-cd mobile
-cp .env.example .env
-npm install
-npm start
-```
-
-The mobile app reads the same published products and market rates as the website. See `mobile/README.md` for Android, iOS and EAS store-build instructions.
-
 ## Project Structure
 - `frontend/src/App.jsx` - Main application with routing logic.
 - `frontend/src/index.css` - Global styles and Tailwind v4 theme definitions (Earthy tones).
 - `frontend/src/pages/` - Includes Home, About, Products, Packaging, Certifications, Contact, Legal.
 - `frontend/src/components/` - Reusable UI components like Navbar and Footer.
 - `backend/main.py` - FastAPI entry point handling the `/api/contact` POST route.
-- `mobile/src/app/` - Expo Router screens for Android and iOS.
 
 ## Features
 - Deep integration between React and FastAPI via standard REST calls.

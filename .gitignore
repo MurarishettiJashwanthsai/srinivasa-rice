@@ -16,4 +16,5 @@ market_data.db
 test_market_data.db
 .pytest_cache/
 .pnpm-store/
+/mobile/
 pictures:videos/train ticket.pdf

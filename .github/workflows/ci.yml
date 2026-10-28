@@ -59,25 +59,3 @@ jobs:
         env:
           ALLOW_STATIC_PRODUCT_FALLBACK: 'true'
         run: npm run build
-
-  mobile:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
-      - name: Install mobile dependencies
-        working-directory: mobile
-        run: npm ci
-      - name: Type-check mobile app
-        working-directory: mobile
-        run: npm run typecheck
-      - name: Validate Expo configuration
-        working-directory: mobile
-        # Use the lockfile-pinned doctor so a future upstream release cannot
-        # make an unchanged, valid mobile build start failing unexpectedly.
-        run: npx expo-doctor
